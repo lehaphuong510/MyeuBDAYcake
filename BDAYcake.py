@@ -4,6 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
+import time # Dùng để canh thời gian hiện thông báo thành công
 
 # --- CẤU HÌNH GIAO DIỆN & UX/UI ---
 st.set_page_config(page_title="Timeline Management", layout="wide")
@@ -64,6 +65,16 @@ st.markdown("""
         margin-bottom: 10px;
         border-left: 5px solid #c62828;
     }
+    /* Style mới cho Note (Hồng Pastel sang Tím Pastel) */
+    .note-box {
+        background: linear-gradient(to right, #F8BBD0, #E1BEE7); 
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        color: #4A148C; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 5px solid #AB47BC;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -89,25 +100,31 @@ def get_google_sheets():
     sheet = client.open_by_url(SPREADSHEET_URL)
     ws_data = sheet.worksheet("Data")
     ws_tasks = sheet.worksheet("Tasks")
-    return ws_data, ws_tasks
+    
+    # Tự động check và tạo sheet Notes nếu chưa có
+    sheet_titles = [w.title for w in sheet.worksheets()]
+    if "Notes" not in sheet_titles:
+        ws_notes = sheet.add_worksheet(title="Notes", rows="100", cols="2")
+        ws_notes.append_row(["Thời gian", "Nội dung Note"])
+    else:
+        ws_notes = sheet.worksheet("Notes")
+        
+    return ws_data, ws_tasks, ws_notes
 
-ws_data, ws_tasks = get_google_sheets()
+ws_data, ws_tasks, ws_notes = get_google_sheets()
 
 # --- HÀM XỬ LÝ DỮ LIỆU LOGIC ---
 def load_and_sync_tasks():
-    # Load Data gốc
     if "source_data" not in st.session_state:
         st.session_state.source_data = ws_data.get_all_records()
     df_data = pd.DataFrame(st.session_state.source_data)
     
-    # Xử lý Logic Ngày sinh nhật
     if 'Ngày sinh nhật' in df_data.columns and 'Ngày giao bánh' in df_data.columns:
         df_data['Ngày sinh nhật'] = df_data.apply(
             lambda row: row['Ngày giao bánh'] if pd.isna(row['Ngày sinh nhật']) or str(row['Ngày sinh nhật']).strip() == '' else row['Ngày sinh nhật'], 
             axis=1
         )
         
-    # Tạo Map Ngày sinh nhật để gán vào UI mà ko cần sửa cột GSheet
     bday_map = {}
     for _, r in df_data.iterrows():
         t = str(r.get('Tên', '')).strip()
@@ -115,7 +132,6 @@ def load_and_sync_tasks():
             bday_map[t] = str(r.get('Ngày sinh nhật', ''))
     st.session_state.birthday_map = bday_map
     
-    # Load Tasks
     if "tasks_data" not in st.session_state:
         st.session_state.tasks_data = ws_tasks.get_all_records()
         
@@ -138,9 +154,8 @@ def load_and_sync_tasks():
         tp = str(row.get('TP', '')).strip()
         loai_banh = str(row.get('Loại bánh', '')).strip()
         
-        # Xử lý lỗi mất số 0 của SĐT lúc tạo task mới
         sdt = str(row.get('DT', '')).strip()
-        if sdt.endswith('.0'): sdt = sdt[:-2] # Cắt đuôi .0 nếu Pandas tự thêm
+        if sdt.endswith('.0'): sdt = sdt[:-2] 
         if sdt and not sdt.startswith('0') and sdt.isdigit():
             sdt = '0' + sdt
         
@@ -169,7 +184,6 @@ def load_and_sync_tasks():
                 ]
                 new_tasks_to_add.append(row_data)
                 
-                # Tạo dict để nhét vào RAM
                 new_tasks_for_state.append({
                     "Task_ID": task_id, "Ngày thực hiện": row_data[1], "Tên người nhận": ten,
                     "TP": tp, "Loại bánh": loai_banh, "Tên Task": t_name,
@@ -258,10 +272,8 @@ with tab_todo:
             tp_loai = f"{r['TP']} - {r['Loại bánh']}" if r['TP'] else ""
             title = f"{date_str} | {prefix} | {tp_loai} - {r['Tên Task']}"
             
-            # Lấy thông tin Ngày Sinh Nhật
             bday = st.session_state.birthday_map.get(prefix, "")
             
-            # Xử lý lỗi SĐT cho các task CŨ đã trót lưu sai
             sdt_hien_thi = str(r['SĐT']).strip()
             if sdt_hien_thi.endswith('.0'): sdt_hien_thi = sdt_hien_thi[:-2]
             if sdt_hien_thi and not sdt_hien_thi.startswith('0') and sdt_hien_thi.isdigit():
@@ -281,12 +293,8 @@ with tab_todo:
             
             if checked != is_done:
                 new_val = "Hoàn thành" if checked else "Chưa hoàn thành"
-                
-                # Push lên Google Sheets
                 row_in_sheet = idx + 2
                 ws_tasks.update_cell(row_in_sheet, 11, new_val)
-                
-                # Sync vào RAM
                 st.session_state.tasks_data[idx]['Trạng thái'] = new_val
                 st.rerun()
 
@@ -309,12 +317,15 @@ st.write("---")
 st.markdown("<h2>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
 list_names = [n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]
 
-with st.form("add_task_form"):
+# Thêm clear_on_submit=True để tự động xóa thông tin sau khi tạo
+with st.form("add_task_form", clear_on_submit=True):
     belong_to = st.selectbox("Task này thuộc:", list_names + ["Khác"])
     task_date = st.date_input("Ngày thực hiện")
     task_name = st.text_input("Task (Fill vào)")
     
     submitted = st.form_submit_button("CREATE TASK")
+    msg_placeholder = st.empty() # Chừa chỗ để hiện thông báo thành công
+    
     if submitted and task_name:
         tp, loai, thiep, sdt, diachi, luuy = "", "", "", "", "", ""
         if belong_to != "Khác":
@@ -322,7 +333,6 @@ with st.form("add_task_form"):
             tp, loai, thiep = sample['TP'], sample['Loại bánh'], sample['Tên trên thiệp']
             diachi, luuy = sample['Địa chỉ'], sample['Lưu ý']
             
-            # Xử lý SĐT cho form add task
             sdt = str(sample['SĐT']).strip()
             if sdt.endswith('.0'): sdt = sdt[:-2]
             if sdt and not sdt.startswith('0') and sdt.isdigit():
@@ -340,7 +350,10 @@ with st.form("add_task_form"):
             "Tên người nhận": belong_to, "TP": tp, "Loại bánh": loai, "Tên Task": task_name,
             "Tên trên thiệp": thiep, "SĐT": sdt, "Địa chỉ": diachi, "Lưu ý": luuy, "Trạng thái": "Chưa hoàn thành"
         })
-        st.success("Tạo task thành công!")
+        
+        # Hiện thông báo, đợi 1.2s rồi tự clear và load lại
+        msg_placeholder.success("Đã thêm task thành công!")
+        time.sleep(1.2)
         st.rerun()
 
 st.write("---")
@@ -372,3 +385,44 @@ with process_cols[1]:
 with process_cols[2]:
     st.markdown("<div class='process-box'>✅ COMPLETED</div>", unsafe_allow_html=True)
     for n in completed: st.write(f"- {n}")
+
+st.write("---")
+
+# 4. CREATE NOTE (KHU VỰC NOTE NHANH)
+st.markdown("<h2>CREATE NOTE</h2>", unsafe_allow_html=True)
+
+# Lấy dữ liệu note nếu chưa có trong RAM
+if "notes_data" not in st.session_state:
+    st.session_state.notes_data = ws_notes.get_all_records()
+
+note_col1, note_col2 = st.columns([1, 2])
+
+# Form tạo Note bên trái
+with note_col1:
+    with st.form("add_note_form", clear_on_submit=True):
+        note_text = st.text_area("Nhập nội dung Note:", height=150)
+        note_submitted = st.form_submit_button("CREATE NOTE")
+        note_msg = st.empty()
+        
+        if note_submitted and note_text:
+            time_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+            ws_notes.append_row([time_str, note_text])
+            st.session_state.notes_data.append({"Thời gian": time_str, "Nội dung Note": note_text})
+            
+            note_msg.success("Đã tạo Note thành công!")
+            time.sleep(1.2)
+            st.rerun()
+
+# Hiển thị list Note bên phải
+with note_col2:
+    if not st.session_state.notes_data:
+        st.info("Chưa có note nào. Hãy tạo note đầu tiên!")
+    else:
+        # Dùng reversed để note mới nhất luôn hiện lên đầu
+        for n in reversed(st.session_state.notes_data):
+            st.markdown(f"""
+            <div class='note-box'>
+                <small style='color: #6a1b9a; font-weight: bold;'>🕒 {n.get('Thời gian', '')}</small><br>
+                <div style='margin-top: 5px; font-size: 1.1em;'>{n.get('Nội dung Note', '')}</div>
+            </div>
+            """, unsafe_allow_html=True)
