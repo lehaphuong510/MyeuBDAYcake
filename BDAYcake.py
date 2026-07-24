@@ -96,8 +96,12 @@ ws_data = sheet.worksheet("Data")
 ws_tasks = sheet.worksheet("Tasks")
 
 # --- HÀM XỬ LÝ DỮ LIỆU LOGIC ---
+# --- HÀM XỬ LÝ DỮ LIỆU LOGIC ---
 def load_and_sync_tasks():
-    df_data = pd.DataFrame(ws_data.get_all_records())
+    # TỐI ƯU 1: Dùng session_state để không phải đọc lại sheet Data nhiều lần
+    if "source_data" not in st.session_state:
+        st.session_state.source_data = ws_data.get_all_records()
+    df_data = pd.DataFrame(st.session_state.source_data)
     
     if 'Ngày sinh nhật' in df_data.columns and 'Ngày giao bánh' in df_data.columns:
         df_data['Ngày sinh nhật'] = df_data.apply(
@@ -239,11 +243,12 @@ with tab_todo:
             
             if checked != is_done:
                 new_val = "Hoàn thành" if checked else "Chưa hoàn thành"
-                cell = ws_tasks.find(r['Task_ID'])
-                if cell:
-                    ws_tasks.update_cell(cell.row, 11, new_val)
+                
+                # TỐI ƯU 2: Tính thẳng số dòng trên sheet từ index của DataFrame (Bỏ lệnh find() tốn API)
+                row_in_sheet = idx + 2 # Dòng 1 là tiêu đề, data bắt đầu từ dòng 2
+                ws_tasks.update_cell(row_in_sheet, 11, new_val)
                 st.rerun()
-
+                
     with sub_tab_0:
         render_task_list(overdue_tasks, "overdue")
     with sub_tab_1:
