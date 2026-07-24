@@ -178,8 +178,17 @@ with tab_cal:
     calendar_events = []
     for _, r in df_tasks.iterrows():
         prefix = r['Tên người nhận'] if r['Tên người nhận'] != "Khác" else "Khác"
-        # Bánh đã xong cho màu tím nhạt, chưa xong cho hồng đậm
-        bg_color = "#8E24AA" if r['Trạng thái'] == "Hoàn thành" else "#D81B60"
+        
+        # LOGIC MÀU SẮC CHO CALENDAR
+        is_done = r['Trạng thái'] == "Hoàn thành"
+        is_overdue = r['Ngày thực hiện'].dt.date < today and not is_done
+        
+        if is_done:
+            bg_color = "#9E9E9E" # Màu xám cho task đã xong
+        elif is_overdue:
+            bg_color = "#E53935" # Màu đỏ cho task quá hạn
+        else:
+            bg_color = "#D81B60" # Màu hồng cho task bình thường
         
         calendar_events.append({
             "title": f"{prefix} | {r['Tên Task']}",
@@ -201,9 +210,9 @@ with tab_cal:
     calendar(events=calendar_events, options=calendar_options)
 
 with tab_todo:
-    sub_tab_1, sub_tab_2, sub_tab_3 = st.tabs(["🕒 HÔM NAY", "📆 TRONG VÒNG 8 NGÀY TỚI", "📅 TRONG VÒNG 1 THÁNG TỚI"])
+    # THÊM TAB OVERDUE
+    sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3 = st.tabs(["⚠️ QUÁ HẠN", "🕒 HÔM NAY", "📆 TRONG VÒNG 8 NGÀY", "📅 TRONG VÒNG 1 THÁNG"])
     
-    # Đã thêm tham số tab_key_suffix để fix lỗi Duplicate Key
     def render_task_list(df_filter, tab_key_suffix):
         if df_filter.empty:
             st.info("Không có task nào trong giai đoạn này!")
@@ -225,7 +234,6 @@ with tab_todo:
             """, unsafe_allow_html=True)
             
             is_done = r['Trạng thái'] == "Hoàn thành"
-            # Thêm tab_key_suffix vào key để phân biệt
             checked = st.checkbox(f"Hoàn thành task: {r['Tên Task']} ({prefix})", value=is_done, key=f"{r['Task_ID']}_{tab_key_suffix}")
             
             if checked != is_done:
@@ -235,6 +243,8 @@ with tab_todo:
                     ws_tasks.update_cell(cell.row, 11, new_val)
                 st.rerun()
 
+    with sub_tab_0:
+        render_task_list(overdue_tasks, "overdue")
     with sub_tab_1:
         render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today], "today")
     with sub_tab_2:
@@ -272,7 +282,7 @@ with st.form("add_task_form"):
 
 st.write("---")
 
-# 3. OVERALL PROCESS (ĐÃ ĐƯA XUỐNG CUỐI TRANG)
+# 3. OVERALL PROCESS
 st.markdown("<h2>OVERALL PROCESS</h2>", unsafe_allow_html=True)
 
 process_cols = st.columns(3)
