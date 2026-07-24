@@ -222,12 +222,23 @@ with tab_cal:
     calendar(events=calendar_events, options=calendar_options)
 
 with tab_todo:
-    sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3 = st.tabs(["⚠️ QUÁ HẠN", "🕒 HÔM NAY", "📆 TRONG VÒNG 8 NGÀY", "📅 TRONG VÒNG 1 THÁNG"])
+    # Đã bóc tách thành 6 tab mới
+    sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3, sub_tab_4, sub_tab_5 = st.tabs([
+        "⚠️ QUÁ HẠN", 
+        "🕒 HÔM NAY", 
+        "🌅 NGÀY MAI", 
+        "⏳ TRONG VÒNG 4 NGÀY", 
+        "📆 TRONG VÒNG 8 NGÀY", 
+        "📅 TRONG VÒNG 1 THÁNG"
+    ])
     
     def render_task_list(df_filter, tab_key_suffix):
         if df_filter.empty:
             st.info("Không có task nào trong giai đoạn này!")
             return
+            
+        # Tính năng Sort: Ưu tiên ngày gần nhất lên trên cùng
+        df_filter = df_filter.sort_values(by='Ngày thực hiện', ascending=True)
             
         for idx, r in df_filter.iterrows():
             date_str = r['Ngày thực hiện'].strftime('%d/%m/%Y')
@@ -260,11 +271,15 @@ with tab_todo:
 
     with sub_tab_0:
         render_task_list(overdue_tasks, "overdue")
-    with sub_tab_1:
+    with sub_tab_1: # Hôm nay
         render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today], "today")
-    with sub_tab_2:
+    with sub_tab_2: # Ngày mai
+        render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today + timedelta(days=1)], "tomorrow")
+    with sub_tab_3: # Trong vòng 4 ngày (bao gồm cả hôm nay tới 4 ngày sau)
+        render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=4))], "4days")
+    with sub_tab_4: # Trong vòng 8 ngày
         render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=8))], "8days")
-    with sub_tab_3:
+    with sub_tab_5: # Trong vòng 1 tháng
         render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=30))], "30days")
 
 st.write("---")
