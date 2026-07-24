@@ -4,7 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
-import time # Dùng để canh thời gian hiện thông báo thành công
+import time
 
 # --- CẤU HÌNH GIAO DIỆN & UX/UI ---
 st.set_page_config(page_title="Timeline Management", layout="wide")
@@ -65,26 +65,57 @@ st.markdown("""
         margin-bottom: 10px;
         border-left: 5px solid #c62828;
     }
-    /* Style mới cho Note (Hồng Pastel sang Tím Pastel) */
+    
+    /* CSS cho thanh Agenda (Sidebar) */
+    .agenda-link {
+        display: block;
+        padding: 10px 15px;
+        margin-bottom: 10px;
+        text-decoration: none;
+        color: #8E24AA;
+        background-color: #fce4ec;
+        border-radius: 8px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        border-left: 4px solid #D81B60;
+    }
+    .agenda-link:hover {
+        background-color: #f8bbd0;
+        color: #4a148c;
+        transform: translateX(5px);
+    }
+
+    /* CSS cho Note: Độ trong suốt 50% (Glassmorphism) */
     .note-box {
-        background: linear-gradient(to right, #F8BBD0, #E1BEE7); 
+        background: linear-gradient(to right, rgba(248, 187, 208, 0.5), rgba(225, 190, 231, 0.5));
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         padding: 15px;
-        margin-bottom: 15px;
+        margin-bottom: 5px; /* Giảm margin bottom để dính với nút Edit */
         border-radius: 8px;
         color: #4A148C; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-left: 5px solid #AB47BC;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border-left: 5px solid rgba(171, 71, 188, 0.8);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# NÚT REFRESH DATA BÊN SIDEBAR
+# --- NÚT REFRESH & AGENDA BÊN SIDEBAR ---
 with st.sidebar:
     st.markdown("### ⚙️ QUẢN TRỊ")
     if st.button("🔄 LÀM MỚI DỮ LIỆU"):
         st.session_state.clear()
         st.rerun()
     st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets và muốn cập nhật lại.")
+    
+    st.markdown("---")
+    st.markdown("### 📑 AGENDA CỦA TRANG")
+    st.markdown("""
+        <a href="#task-management" class="agenda-link">📍 TASK MANAGEMENT</a>
+        <a href="#add-task" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
+        <a href="#overall-process" class="agenda-link">📍 OVERALL PROCESS</a>
+        <a href="#create-note" class="agenda-link">📍 CREATE NOTE</a>
+    """, unsafe_allow_html=True)
 
 # --- KẾT NỐI GOOGLE SHEETS ---
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1SQrD2ps8L9mEXM8UTsqMalI090_mMT3WTLHY9lAhtBI/edit"
@@ -101,7 +132,6 @@ def get_google_sheets():
     ws_data = sheet.worksheet("Data")
     ws_tasks = sheet.worksheet("Tasks")
     
-    # Tự động check và tạo sheet Notes nếu chưa có
     sheet_titles = [w.title for w in sheet.worksheets()]
     if "Notes" not in sheet_titles:
         ws_notes = sheet.add_worksheet(title="Notes", rows="100", cols="2")
@@ -213,8 +243,10 @@ if not overdue_tasks.empty:
     for _, r in overdue_tasks.iterrows():
         st.markdown(f"<div class='overdue-alert'>⚠️ {r['Tên người nhận']} - {r['Tên Task']} đã quá deadline</div>", unsafe_allow_html=True)
 
+# ==========================================
 # 1. TASK MANAGEMENT
-st.markdown("<h2>TASK MANAGEMENT</h2>", unsafe_allow_html=True)
+# ==========================================
+st.markdown("<h2 id='task-management'>TASK MANAGEMENT</h2>", unsafe_allow_html=True)
 tab_cal, tab_todo = st.tabs(["🗓️ LỊCH (CALENDAR)", "📋 TO-DO LIST (CHI TIẾT)"])
 
 with tab_cal:
@@ -313,18 +345,19 @@ with tab_todo:
 
 st.write("---")
 
+# ==========================================
 # 2. ADD TASK
-st.markdown("<h2>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
+# ==========================================
+st.markdown("<h2 id='add-task'>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
 list_names = [n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]
 
-# Thêm clear_on_submit=True để tự động xóa thông tin sau khi tạo
 with st.form("add_task_form", clear_on_submit=True):
     belong_to = st.selectbox("Task này thuộc:", list_names + ["Khác"])
     task_date = st.date_input("Ngày thực hiện")
     task_name = st.text_input("Task (Fill vào)")
     
     submitted = st.form_submit_button("CREATE TASK")
-    msg_placeholder = st.empty() # Chừa chỗ để hiện thông báo thành công
+    msg_placeholder = st.empty() 
     
     if submitted and task_name:
         tp, loai, thiep, sdt, diachi, luuy = "", "", "", "", "", ""
@@ -351,15 +384,16 @@ with st.form("add_task_form", clear_on_submit=True):
             "Tên trên thiệp": thiep, "SĐT": sdt, "Địa chỉ": diachi, "Lưu ý": luuy, "Trạng thái": "Chưa hoàn thành"
         })
         
-        # Hiện thông báo, đợi 1.2s rồi tự clear và load lại
         msg_placeholder.success("Đã thêm task thành công!")
         time.sleep(1.2)
         st.rerun()
 
 st.write("---")
 
+# ==========================================
 # 3. OVERALL PROCESS
-st.markdown("<h2>OVERALL PROCESS</h2>", unsafe_allow_html=True)
+# ==========================================
+st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
 
 process_cols = st.columns(3)
 grouped = df_tasks.groupby('Tên người nhận')
@@ -388,10 +422,11 @@ with process_cols[2]:
 
 st.write("---")
 
-# 4. CREATE NOTE (KHU VỰC NOTE NHANH)
-st.markdown("<h2>CREATE NOTE</h2>", unsafe_allow_html=True)
+# ==========================================
+# 4. CREATE NOTE (KHU VỰC NOTE NHANH + EDIT)
+# ==========================================
+st.markdown("<h2 id='create-note'>CREATE NOTE</h2>", unsafe_allow_html=True)
 
-# Lấy dữ liệu note nếu chưa có trong RAM
 if "notes_data" not in st.session_state:
     st.session_state.notes_data = ws_notes.get_all_records()
 
@@ -413,16 +448,29 @@ with note_col1:
             time.sleep(1.2)
             st.rerun()
 
-# Hiển thị list Note bên phải
+# Hiển thị và Edit Note bên phải
 with note_col2:
     if not st.session_state.notes_data:
         st.info("Chưa có note nào. Hãy tạo note đầu tiên!")
     else:
-        # Dùng reversed để note mới nhất luôn hiện lên đầu
-        for n in reversed(st.session_state.notes_data):
+        # Lấy data và đánh index để tiện cho việc update đúng dòng Google Sheets
+        # Google Sheets: dòng 1 là tiêu đề, note 0 -> dòng 2, note 1 -> dòng 3...
+        for idx, n in reversed(list(enumerate(st.session_state.notes_data))):
+            
+            # Hiển thị note
             st.markdown(f"""
             <div class='note-box'>
                 <small style='color: #6a1b9a; font-weight: bold;'>🕒 {n.get('Thời gian', '')}</small><br>
-                <div style='margin-top: 5px; font-size: 1.1em;'>{n.get('Nội dung Note', '')}</div>
+                <div style='margin-top: 5px; font-size: 1.1em; white-space: pre-wrap;'>{n.get('Nội dung Note', '')}</div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Khung Edit Ẩn
+            with st.expander(f"✏️ Edit Note"):
+                new_note_content = st.text_area("Sửa nội dung:", value=n.get('Nội dung Note', ''), key=f"edit_note_{idx}")
+                if st.button("Lưu thay đổi", key=f"save_note_{idx}"):
+                    # Update GSheets (Row = index + 2)
+                    ws_notes.update_cell(idx + 2, 2, new_note_content)
+                    # Update RAM cache
+                    st.session_state.notes_data[idx]['Nội dung Note'] = new_note_content
+                    st.rerun()
