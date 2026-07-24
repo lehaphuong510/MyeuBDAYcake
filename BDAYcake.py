@@ -25,6 +25,8 @@ st.markdown("""
         color: #D81B60;
         font-size: 1.1rem;
     }
+    
+    /* CSS cho Task Box - Fix lại để có thể click xổ ra */
     .task-box {
         border-left: 5px solid #D81B60;
         background-color: #fcfcfc;
@@ -37,8 +39,37 @@ st.markdown("""
         color: #8E24AA;
         font-weight: bold;
         font-size: 1.15em;
-        margin-bottom: 8px;
+        cursor: pointer;
+        outline: none;
     }
+    /* Ẩn mũi tên mặc định của thẻ details */
+    details > summary {
+        list-style: none; 
+    }
+    details > summary::-webkit-details-marker {
+        display: none;
+    }
+    /* Tạo mũi tên tuỳ chỉnh đẹp hơn */
+    .task-title::before {
+        content: "▶";
+        display: inline-block;
+        margin-right: 10px;
+        color: #D81B60;
+        font-size: 0.8em;
+        transition: transform 0.2s ease;
+    }
+    /* Xoay mũi tên khi mở ra */
+    details[open] > .task-title::before {
+        transform: rotate(90deg);
+    }
+    .task-content {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px dashed #f8bbd0;
+        color: #333333;
+        line-height: 1.6;
+    }
+    
     .stButton>button {
         background: linear-gradient(to right, #D81B60, #8E24AA);
         color: white;
@@ -111,7 +142,6 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 📑 AGENDA CỦA TRANG")
-    # Đã sửa lại ID section-add-task để đảm bảo trượt mượt mà
     st.markdown("""
         <a href="#task-management" target="_self" class="agenda-link">📍 TASK MANAGEMENT</a>
         <a href="#section-add-task" target="_self" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
@@ -364,12 +394,17 @@ with tab_todo:
             if sdt_hien_thi and not sdt_hien_thi.startswith('0') and sdt_hien_thi.isdigit():
                 sdt_hien_thi = '0' + sdt_hien_thi
             
+            # ĐÃ UPDATE LẠI ĐOẠN NÀY ĐỂ TẠO HIỆU ỨNG SỔ RA
             st.markdown(f"""
             <div class='task-box'>
-                <div class='task-title'>{title}</div>
-                <div><b>Ngày sinh nhật:</b> {bday} | <b>Tên thiệp:</b> {r['Tên trên thiệp']} | <b>SĐT:</b> {sdt_hien_thi}</div>
-                <div><b>Địa chỉ:</b> {r['Địa chỉ']}</div>
-                <div><b>Lưu ý:</b> {r['Lưu ý']}</div>
+                <details>
+                    <summary class='task-title'>{title}</summary>
+                    <div class='task-content'>
+                        <div><b>Ngày sinh nhật:</b> {bday} | <b>Tên thiệp:</b> {r['Tên trên thiệp']} | <b>SĐT:</b> {sdt_hien_thi}</div>
+                        <div><b>Địa chỉ:</b> {r['Địa chỉ']}</div>
+                        <div><b>Lưu ý:</b> {r['Lưu ý']}</div>
+                    </div>
+                </details>
             </div>
             """, unsafe_allow_html=True)
             
@@ -401,7 +436,6 @@ st.write("---")
 # ==========================================
 # 2. ADD TASK
 # ==========================================
-# Tuyệt chiêu: Tạo 1 thẻ div vô hình làm neo (anchor) để đảm bảo không bị Streamlit ghi đè ID
 st.markdown("<div id='section-add-task'></div>", unsafe_allow_html=True)
 st.markdown("<h2>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
 
