@@ -76,19 +76,23 @@ with st.sidebar:
     st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets và muốn cập nhật lại.")
 
 # --- KẾT NỐI GOOGLE SHEETS ---
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1SQrD2ps8L9mEXM8UTsqMalI090_mMT3WTLHY9lAhtBI/edit"
+
 @st.cache_resource
-def get_gspread_client():
+def get_google_sheets():
     creds_dict = st.secrets["gcp_service_account"]
     creds = Credentials.from_service_account_info(
         creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
-    return gspread.authorize(creds)
+    client = gspread.authorize(creds)
+    
+    # Gom hết các lệnh mở sheet vào trong cache để không bị chạy lại mỗi khi tick
+    sheet = client.open_by_url(SPREADSHEET_URL)
+    ws_data = sheet.worksheet("Data")
+    ws_tasks = sheet.worksheet("Tasks")
+    return ws_data, ws_tasks
 
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1SQrD2ps8L9mEXM8UTsqMalI090_mMT3WTLHY9lAhtBI/edit"
-client = get_gspread_client()
-sheet = client.open_by_url(SPREADSHEET_URL)
-ws_data = sheet.worksheet("Data")
-ws_tasks = sheet.worksheet("Tasks")
+ws_data, ws_tasks = get_google_sheets()
 
 # --- HÀM XỬ LÝ DỮ LIỆU LOGIC ---
 def load_and_sync_tasks():
