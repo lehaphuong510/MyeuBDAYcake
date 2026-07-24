@@ -111,10 +111,10 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 📑 AGENDA CỦA TRANG")
-    # FIX LỖI AGENDA ADD TASK: Đổi href thành id độc nhất để không bị đụng với Streamlit
+    # Đã sửa lại ID section-add-task để đảm bảo trượt mượt mà
     st.markdown("""
         <a href="#task-management" target="_self" class="agenda-link">📍 TASK MANAGEMENT</a>
-        <a href="#khu-vuc-add-task" target="_self" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
+        <a href="#section-add-task" target="_self" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
         <a href="#overall-process" target="_self" class="agenda-link">📍 OVERALL PROCESS</a>
         <a href="#create-note" target="_self" class="agenda-link">📍 CREATE NOTE</a>
     """, unsafe_allow_html=True)
@@ -282,7 +282,7 @@ with tab_cal:
         "initialView": "dayGridMonth"
     }
     
-    # FIX CSS LỊCH: Đơn sắc, Today trong suốt chữ hồng, Tháng/Tuần đổi Đen-Hồng, 2 Mũi tên lệch màu
+    # CSS Tùy chỉnh lịch
     custom_calendar_css = """
     /* Reset chung */
     .fc .fc-button-primary {
@@ -303,16 +303,19 @@ with tab_cal:
         opacity: 0.5 !important;
     }
 
-    /* Nút mũi tên TRÁI (Prev): Màu Hồng đậm */
-    .fc .fc-prev-button {
-        background-color: #D81B60 !important;
-        color: white !important;
-    }
-
-    /* Nút mũi tên PHẢI (Next): Màu Tím */
+    /* Nút mũi tên TRÁI và PHẢI: Không nền, viền xám, icon xám */
+    .fc .fc-prev-button,
     .fc .fc-next-button {
-        background-color: #8E24AA !important;
-        color: white !important;
+        background-color: transparent !important;
+        border: 1px solid #9E9E9E !important;
+        color: #555555 !important;
+    }
+    
+    /* Hiệu ứng hover nhẹ cho 2 nút mũi tên */
+    .fc .fc-prev-button:hover,
+    .fc .fc-next-button:hover {
+        background-color: #f5f5f5 !important;
+        color: #333333 !important;
     }
 
     /* Nút Month / Week: Mặc định là màu Đen */
@@ -398,8 +401,10 @@ st.write("---")
 # ==========================================
 # 2. ADD TASK
 # ==========================================
-# Cập nhật id thành khu-vuc-add-task để mapping chuẩn với thẻ a href bên Sidebar
-st.markdown("<h2 id='khu-vuc-add-task'>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
+# Tuyệt chiêu: Tạo 1 thẻ div vô hình làm neo (anchor) để đảm bảo không bị Streamlit ghi đè ID
+st.markdown("<div id='section-add-task'></div>", unsafe_allow_html=True)
+st.markdown("<h2>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
+
 list_names = [n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]
 
 with st.form("add_task_form", clear_on_submit=True):
