@@ -181,7 +181,8 @@ with tab_cal:
         
         # LOGIC MÀU SẮC CHO CALENDAR
         is_done = r['Trạng thái'] == "Hoàn thành"
-        is_overdue = r['Ngày thực hiện'].dt.date < today and not is_done
+        # Đã xóa .dt ở dòng dưới
+        is_overdue = r['Ngày thực hiện'].date() < today and not is_done
         
         if is_done:
             bg_color = "#9E9E9E" # Màu xám cho task đã xong
