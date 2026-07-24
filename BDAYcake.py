@@ -66,13 +66,13 @@ st.markdown("""
         border-left: 5px solid #c62828;
     }
     
-    /* CSS cho thanh Agenda (Sidebar) - Đã bỏ gạch chân, đổi màu Theme */
+    /* CSS cho thanh Agenda (Sidebar) - target="_self" sẽ được xử lý ở HTML */
     .agenda-link {
         display: block;
         padding: 10px 15px;
         margin-bottom: 10px;
         text-decoration: none !important;
-        color: #8E24AA !important; /* Chữ màu tím theme */
+        color: #8E24AA !important; 
         background-color: #fce4ec;
         border-radius: 8px;
         font-weight: bold;
@@ -81,7 +81,7 @@ st.markdown("""
     }
     .agenda-link:hover {
         background-color: #f8bbd0;
-        color: #D81B60 !important; /* Chữ màu hồng khi lướt chuột */
+        color: #D81B60 !important; 
         transform: translateX(5px);
         text-decoration: none !important;
     }
@@ -111,11 +111,12 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 📑 AGENDA CỦA TRANG")
+    # ĐÃ FIX: Thêm target="_self" để bấm phát trượt luôn
     st.markdown("""
-        <a href="#muc-task-management" class="agenda-link">📍 TASK MANAGEMENT</a>
-        <a href="#muc-add-task" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
-        <a href="#muc-overall-process" class="agenda-link">📍 OVERALL PROCESS</a>
-        <a href="#muc-create-note" class="agenda-link">📍 CREATE NOTE</a>
+        <a href="#task-management" target="_self" class="agenda-link">📍 TASK MANAGEMENT</a>
+        <a href="#add-task" target="_self" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
+        <a href="#overall-process" target="_self" class="agenda-link">📍 OVERALL PROCESS</a>
+        <a href="#create-note" target="_self" class="agenda-link">📍 CREATE NOTE</a>
     """, unsafe_allow_html=True)
 
 # --- KẾT NỐI GOOGLE SHEETS ---
@@ -247,7 +248,7 @@ if not overdue_tasks.empty:
 # ==========================================
 # 1. TASK MANAGEMENT
 # ==========================================
-st.markdown("<h2 id='muc-task-management'>TASK MANAGEMENT</h2>", unsafe_allow_html=True)
+st.markdown("<h2 id='task-management'>TASK MANAGEMENT</h2>", unsafe_allow_html=True)
 tab_cal, tab_todo = st.tabs(["🗓️ LỊCH (CALENDAR)", "📋 TO-DO LIST (CHI TIẾT)"])
 
 with tab_cal:
@@ -258,18 +259,19 @@ with tab_cal:
         is_done = r['Trạng thái'] == "Hoàn thành"
         is_overdue = r['Ngày thực hiện'].date() < today and not is_done
         
+        # Đã trả màu nền task về nguyên thủy (Hồng)
         if is_done:
-            bg_color = "#9E9E9E" # Màu xám
+            bg_color = "#9E9E9E" 
         elif is_overdue:
-            bg_color = "#c62828" # Màu đỏ cảnh báo
+            bg_color = "#c62828" 
         else:
-            bg_color = "#8E24AA" # Tím Theme (thay cho đỏ cam cũ)
+            bg_color = "#D81B60" 
         
         calendar_events.append({
             "title": f"{prefix} | {r['Tên Task']}",
             "start": r['Ngày thực hiện'].strftime("%Y-%m-%d"),
             "backgroundColor": bg_color,
-            "borderColor": "transparent" # Bỏ viền
+            "borderColor": "transparent"
         })
 
     calendar_options = {
@@ -280,7 +282,27 @@ with tab_cal:
         },
         "initialView": "dayGridMonth"
     }
-    calendar(events=calendar_events, options=calendar_options)
+    
+    # ĐÃ FIX: Can thiệp CSS ẩn vào các nút của Calendar (Bỏ viền, đổi màu nền nút sang gradient theme)
+    custom_calendar_css = """
+    .fc .fc-button-primary {
+        background-color: #D81B60 !important;
+        background-image: linear-gradient(to right, #D81B60, #8E24AA) !important;
+        border: none !important;
+        box-shadow: none !important;
+        text-transform: uppercase !important;
+        font-weight: bold !important;
+    }
+    .fc .fc-button-primary:hover {
+        opacity: 0.8 !important;
+    }
+    .fc .fc-button-primary:not(:disabled).fc-button-active,
+    .fc .fc-button-primary:not(:disabled):active {
+        background-image: linear-gradient(to right, #8E24AA, #D81B60) !important;
+    }
+    """
+    
+    calendar(events=calendar_events, options=calendar_options, custom_css=custom_calendar_css)
 
 with tab_todo:
     sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3, sub_tab_4, sub_tab_5 = st.tabs([
@@ -349,7 +371,7 @@ st.write("---")
 # ==========================================
 # 2. ADD TASK
 # ==========================================
-st.markdown("<h2 id='muc-add-task'>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
+st.markdown("<h2 id='add-task'>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
 list_names = [n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]
 
 with st.form("add_task_form", clear_on_submit=True):
@@ -394,7 +416,7 @@ st.write("---")
 # ==========================================
 # 3. OVERALL PROCESS
 # ==========================================
-st.markdown("<h2 id='muc-overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
+st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
 
 process_cols = st.columns(3)
 grouped = df_tasks.groupby('Tên người nhận')
@@ -426,7 +448,7 @@ st.write("---")
 # ==========================================
 # 4. CREATE NOTE (KHU VỰC NOTE NHANH + EDIT MƯỢT MÀ)
 # ==========================================
-st.markdown("<h2 id='muc-create-note'>CREATE NOTE</h2>", unsafe_allow_html=True)
+st.markdown("<h2 id='create-note'>CREATE NOTE</h2>", unsafe_allow_html=True)
 
 if "notes_data" not in st.session_state:
     st.session_state.notes_data = ws_notes.get_all_records()
@@ -456,7 +478,6 @@ with note_col2:
     else:
         for idx, n in reversed(list(enumerate(st.session_state.notes_data))):
             
-            # Hiển thị note
             st.markdown(f"""
             <div class='note-box'>
                 <small style='color: #6a1b9a; font-weight: bold;'>🕒 {n.get('Thời gian', '')}</small><br>
@@ -464,7 +485,6 @@ with note_col2:
             </div>
             """, unsafe_allow_html=True)
             
-            # Logic Edit Note bằng Button ẩn/hiện (khắc phục lỗi của expander)
             if f"edit_mode_{idx}" not in st.session_state:
                 st.session_state[f"edit_mode_{idx}"] = False
                 
@@ -477,6 +497,5 @@ with note_col2:
                 if st.button("Lưu thay đổi", key=f"save_note_{idx}"):
                     ws_notes.update_cell(idx + 2, 2, new_note_content)
                     st.session_state.notes_data[idx]['Nội dung Note'] = new_note_content
-                    # Tự động gập form lại sau khi ấn Lưu
                     st.session_state[f"edit_mode_{idx}"] = False 
                     st.rerun()
