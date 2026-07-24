@@ -86,7 +86,6 @@ def get_google_sheets():
     )
     client = gspread.authorize(creds)
     
-    # Gom hết các lệnh mở sheet vào trong cache để không bị chạy lại mỗi khi tick
     sheet = client.open_by_url(SPREADSHEET_URL)
     ws_data = sheet.worksheet("Data")
     ws_tasks = sheet.worksheet("Tasks")
@@ -101,11 +100,20 @@ def load_and_sync_tasks():
         st.session_state.source_data = ws_data.get_all_records()
     df_data = pd.DataFrame(st.session_state.source_data)
     
+    # Xử lý Logic Ngày sinh nhật
     if 'Ngày sinh nhật' in df_data.columns and 'Ngày giao bánh' in df_data.columns:
         df_data['Ngày sinh nhật'] = df_data.apply(
             lambda row: row['Ngày giao bánh'] if pd.isna(row['Ngày sinh nhật']) or str(row['Ngày sinh nhật']).strip() == '' else row['Ngày sinh nhật'], 
             axis=1
         )
+        
+    # Tạo Map Ngày sinh nhật để gán vào UI mà ko cần sửa cột GSheet
+    bday_map = {}
+    for _, r in df_data.iterrows():
+        t = str(r.get('Tên', '')).strip()
+        if t:
+            bday_map[t] = str(r.get('Ngày sinh nhật', ''))
+    st.session_state.birthday_map = bday_map
     
     # Load Tasks
     if "tasks_data" not in st.session_state:
@@ -130,6 +138,12 @@ def load_and_sync_tasks():
         tp = str(row.get('TP', '')).strip()
         loai_banh = str(row.get('Loại bánh', '')).strip()
         
+        # Xử lý lỗi mất số 0 của SĐT lúc tạo task mới
+        sdt = str(row.get('DT', '')).strip()
+        if sdt.endswith('.0'): sdt = sdt[:-2] # Cắt đuôi .0 nếu Pandas tự thêm
+        if sdt and not sdt.startswith('0') and sdt.isdigit():
+            sdt = '0' + sdt
+        
         tasks_to_create = []
         if tp == 'TPHCM' or (tp != 'TPHCM' and loai_banh == 'Gato'):
             tasks_to_create = [
@@ -150,7 +164,7 @@ def load_and_sync_tasks():
             if task_id not in existing_task_ids:
                 row_data = [
                     task_id, t_date.strftime("%d/%m/%Y"), ten, tp, loai_banh, t_name,
-                    str(row.get('Tên trên thiệp/ bánh', '')), str(row.get('DT', '')), 
+                    str(row.get('Tên trên thiệp/ bánh', '')), sdt, 
                     str(row.get('Địa chỉ', '')), str(row.get('Lưu ý', '')), "Chưa hoàn thành"
                 ]
                 new_tasks_to_add.append(row_data)
@@ -222,7 +236,6 @@ with tab_cal:
     calendar(events=calendar_events, options=calendar_options)
 
 with tab_todo:
-    # Đã bóc tách thành 6 tab mới
     sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3, sub_tab_4, sub_tab_5 = st.tabs([
         "⚠️ QUÁ HẠN", 
         "🕒 HÔM NAY", 
@@ -237,7 +250,6 @@ with tab_todo:
             st.info("Không có task nào trong giai đoạn này!")
             return
             
-        # Tính năng Sort: Ưu tiên ngày gần nhất lên trên cùng
         df_filter = df_filter.sort_values(by='Ngày thực hiện', ascending=True)
             
         for idx, r in df_filter.iterrows():
@@ -246,10 +258,19 @@ with tab_todo:
             tp_loai = f"{r['TP']} - {r['Loại bánh']}" if r['TP'] else ""
             title = f"{date_str} | {prefix} | {tp_loai} - {r['Tên Task']}"
             
+            # Lấy thông tin Ngày Sinh Nhật
+            bday = st.session_state.birthday_map.get(prefix, "")
+            
+            # Xử lý lỗi SĐT cho các task CŨ đã trót lưu sai
+            sdt_hien_thi = str(r['SĐT']).strip()
+            if sdt_hien_thi.endswith('.0'): sdt_hien_thi = sdt_hien_thi[:-2]
+            if sdt_hien_thi and not sdt_hien_thi.startswith('0') and sdt_hien_thi.isdigit():
+                sdt_hien_thi = '0' + sdt_hien_thi
+            
             st.markdown(f"""
             <div class='task-box'>
                 <div class='task-title'>{title}</div>
-                <div><b>Tên thiệp:</b> {r['Tên trên thiệp']} | <b>SĐT:</b> {r['SĐT']}</div>
+                <div><b>Ngày sinh nhật:</b> {bday} | <b>Tên thiệp:</b> {r['Tên trên thiệp']} | <b>SĐT:</b> {sdt_hien_thi}</div>
                 <div><b>Địa chỉ:</b> {r['Địa chỉ']}</div>
                 <div><b>Lưu ý:</b> {r['Lưu ý']}</div>
             </div>
@@ -265,21 +286,21 @@ with tab_todo:
                 row_in_sheet = idx + 2
                 ws_tasks.update_cell(row_in_sheet, 11, new_val)
                 
-                # Sync vào RAM để khỏi load lại API
+                # Sync vào RAM
                 st.session_state.tasks_data[idx]['Trạng thái'] = new_val
                 st.rerun()
 
     with sub_tab_0:
         render_task_list(overdue_tasks, "overdue")
-    with sub_tab_1: # Hôm nay
+    with sub_tab_1:
         render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today], "today")
-    with sub_tab_2: # Ngày mai
+    with sub_tab_2:
         render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today + timedelta(days=1)], "tomorrow")
-    with sub_tab_3: # Trong vòng 4 ngày (bao gồm cả hôm nay tới 4 ngày sau)
+    with sub_tab_3:
         render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=4))], "4days")
-    with sub_tab_4: # Trong vòng 8 ngày
+    with sub_tab_4:
         render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=8))], "8days")
-    with sub_tab_5: # Trong vòng 1 tháng
+    with sub_tab_5:
         render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=30))], "30days")
 
 st.write("---")
@@ -298,8 +319,14 @@ with st.form("add_task_form"):
         tp, loai, thiep, sdt, diachi, luuy = "", "", "", "", "", ""
         if belong_to != "Khác":
             sample = df_tasks[df_tasks['Tên người nhận'] == belong_to].iloc[0]
-            tp, loai, thiep, sdt = sample['TP'], sample['Loại bánh'], sample['Tên trên thiệp'], sample['SĐT']
+            tp, loai, thiep = sample['TP'], sample['Loại bánh'], sample['Tên trên thiệp']
             diachi, luuy = sample['Địa chỉ'], sample['Lưu ý']
+            
+            # Xử lý SĐT cho form add task
+            sdt = str(sample['SĐT']).strip()
+            if sdt.endswith('.0'): sdt = sdt[:-2]
+            if sdt and not sdt.startswith('0') and sdt.isdigit():
+                sdt = '0' + sdt
             
         new_id = f"Manual_{belong_to}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
@@ -308,7 +335,6 @@ with st.form("add_task_form"):
             thiep, sdt, diachi, luuy, "Chưa hoàn thành"
         ])
         
-        # Sync vào RAM ngay lập tức
         st.session_state.tasks_data.append({
             "Task_ID": new_id, "Ngày thực hiện": task_date.strftime("%d/%m/%Y"), 
             "Tên người nhận": belong_to, "TP": tp, "Loại bánh": loai, "Tên Task": task_name,
