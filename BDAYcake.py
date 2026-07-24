@@ -66,7 +66,7 @@ st.markdown("""
         border-left: 5px solid #c62828;
     }
     
-    /* CSS cho thanh Agenda (Sidebar) - target="_self" sẽ được xử lý ở HTML */
+    /* CSS cho thanh Agenda (Sidebar) */
     .agenda-link {
         display: block;
         padding: 10px 15px;
@@ -111,10 +111,10 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 📑 AGENDA CỦA TRANG")
-    # ĐÃ FIX: Thêm target="_self" để bấm phát trượt luôn
+    # FIX LỖI AGENDA ADD TASK: Đổi href thành id độc nhất để không bị đụng với Streamlit
     st.markdown("""
         <a href="#task-management" target="_self" class="agenda-link">📍 TASK MANAGEMENT</a>
-        <a href="#add-task" target="_self" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
+        <a href="#khu-vuc-add-task" target="_self" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
         <a href="#overall-process" target="_self" class="agenda-link">📍 OVERALL PROCESS</a>
         <a href="#create-note" target="_self" class="agenda-link">📍 CREATE NOTE</a>
     """, unsafe_allow_html=True)
@@ -259,7 +259,6 @@ with tab_cal:
         is_done = r['Trạng thái'] == "Hoàn thành"
         is_overdue = r['Ngày thực hiện'].date() < today and not is_done
         
-        # Đã trả màu nền task về nguyên thủy (Hồng)
         if is_done:
             bg_color = "#9E9E9E" 
         elif is_overdue:
@@ -283,22 +282,50 @@ with tab_cal:
         "initialView": "dayGridMonth"
     }
     
-    # ĐÃ FIX: Can thiệp CSS ẩn vào các nút của Calendar (Bỏ viền, đổi màu nền nút sang gradient theme)
+    # FIX CSS LỊCH: Đơn sắc, Today trong suốt chữ hồng, Tháng/Tuần đổi Đen-Hồng, 2 Mũi tên lệch màu
     custom_calendar_css = """
+    /* Reset chung */
     .fc .fc-button-primary {
-        background-color: #D81B60 !important;
-        background-image: linear-gradient(to right, #D81B60, #8E24AA) !important;
+        background-image: none !important;
         border: none !important;
         box-shadow: none !important;
         text-transform: uppercase !important;
         font-weight: bold !important;
     }
-    .fc .fc-button-primary:hover {
-        opacity: 0.8 !important;
+
+    /* Nút Today: Không nền, không viền, chữ hồng đậm */
+    .fc .fc-today-button {
+        background-color: transparent !important;
+        color: #D81B60 !important;
+        border: none !important;
     }
-    .fc .fc-button-primary:not(:disabled).fc-button-active,
-    .fc .fc-button-primary:not(:disabled):active {
-        background-image: linear-gradient(to right, #8E24AA, #D81B60) !important;
+    .fc .fc-today-button:disabled {
+        opacity: 0.5 !important;
+    }
+
+    /* Nút mũi tên TRÁI (Prev): Màu Hồng đậm */
+    .fc .fc-prev-button {
+        background-color: #D81B60 !important;
+        color: white !important;
+    }
+
+    /* Nút mũi tên PHẢI (Next): Màu Tím */
+    .fc .fc-next-button {
+        background-color: #8E24AA !important;
+        color: white !important;
+    }
+
+    /* Nút Month / Week: Mặc định là màu Đen */
+    .fc .fc-dayGridMonth-button, 
+    .fc .fc-timeGridWeek-button {
+        background-color: #000000 !important;
+        color: white !important;
+    }
+
+    /* Nút Month / Week khi đang được chọn (Active): Hồng đậm */
+    .fc .fc-dayGridMonth-button.fc-button-active, 
+    .fc .fc-timeGridWeek-button.fc-button-active {
+        background-color: #D81B60 !important;
     }
     """
     
@@ -371,7 +398,8 @@ st.write("---")
 # ==========================================
 # 2. ADD TASK
 # ==========================================
-st.markdown("<h2 id='add-task'>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
+# Cập nhật id thành khu-vuc-add-task để mapping chuẩn với thẻ a href bên Sidebar
+st.markdown("<h2 id='khu-vuc-add-task'>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
 list_names = [n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]
 
 with st.form("add_task_form", clear_on_submit=True):
@@ -446,7 +474,7 @@ with process_cols[2]:
 st.write("---")
 
 # ==========================================
-# 4. CREATE NOTE (KHU VỰC NOTE NHANH + EDIT MƯỢT MÀ)
+# 4. CREATE NOTE
 # ==========================================
 st.markdown("<h2 id='create-note'>CREATE NOTE</h2>", unsafe_allow_html=True)
 
@@ -455,7 +483,7 @@ if "notes_data" not in st.session_state:
 
 note_col1, note_col2 = st.columns([1, 2])
 
-# Form tạo Note bên trái
+# Form tạo Note
 with note_col1:
     with st.form("add_note_form", clear_on_submit=True):
         note_text = st.text_area("Nhập nội dung Note:", height=150)
@@ -471,7 +499,7 @@ with note_col1:
             time.sleep(1.2)
             st.rerun()
 
-# Hiển thị và Edit Note bên phải
+# Hiển thị và Edit Note
 with note_col2:
     if not st.session_state.notes_data:
         st.info("Chưa có note nào. Hãy tạo note đầu tiên!")
