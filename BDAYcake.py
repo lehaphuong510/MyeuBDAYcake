@@ -10,7 +10,6 @@ st.set_page_config(page_title="Timeline Management", layout="wide")
 
 st.markdown("""
 <style>
-    /* Tone màu hồng đậm sang tím, font in hoa, không rớt chữ */
     h1, h2, h3, h4, .theme-text {
         background: linear-gradient(to right, #D81B60, #8E24AA);
         -webkit-background-clip: text;
@@ -20,15 +19,11 @@ st.markdown("""
         text-align: left;
         font-weight: bold;
     }
-    
-    /* Style cho các Tab */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         font-weight: bold;
         color: #D81B60;
         font-size: 1.1rem;
     }
-    
-    /* Box Task Management */
     .task-box {
         border-left: 5px solid #D81B60;
         background-color: #fcfcfc;
@@ -37,16 +32,12 @@ st.markdown("""
         border-radius: 5px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    
-    /* Tiêu đề Task có màu nổi bật */
     .task-title {
         color: #8E24AA;
         font-weight: bold;
         font-size: 1.15em;
         margin-bottom: 8px;
     }
-    
-    /* Nút Button chung */
     .stButton>button {
         background: linear-gradient(to right, #D81B60, #8E24AA);
         color: white;
@@ -54,8 +45,6 @@ st.markdown("""
         font-weight: bold;
         border: none;
     }
-    
-    /* Box Overall Process bo góc, nền gradient */
     .process-box {
         background: linear-gradient(to right, #D81B60, #8E24AA);
         color: white;
@@ -66,8 +55,6 @@ st.markdown("""
         font-size: 1.2em;
         margin-bottom: 15px;
     }
-    
-    /* Cảnh báo Overdue */
     .overdue-alert {
         background-color: #ffebee;
         color: #c62828;
@@ -79,6 +66,14 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# NÚT REFRESH DATA BÊN SIDEBAR
+with st.sidebar:
+    st.markdown("### ⚙️ QUẢN TRỊ")
+    if st.button("🔄 LÀM MỚI DỮ LIỆU"):
+        st.session_state.clear()
+        st.rerun()
+    st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets và muốn cập nhật lại.")
 
 # --- KẾT NỐI GOOGLE SHEETS ---
 @st.cache_resource
@@ -96,9 +91,8 @@ ws_data = sheet.worksheet("Data")
 ws_tasks = sheet.worksheet("Tasks")
 
 # --- HÀM XỬ LÝ DỮ LIỆU LOGIC ---
-# --- HÀM XỬ LÝ DỮ LIỆU LOGIC ---
 def load_and_sync_tasks():
-    # TỐI ƯU 1: Dùng session_state để không phải đọc lại sheet Data nhiều lần
+    # Load Data gốc
     if "source_data" not in st.session_state:
         st.session_state.source_data = ws_data.get_all_records()
     df_data = pd.DataFrame(st.session_state.source_data)
@@ -109,11 +103,15 @@ def load_and_sync_tasks():
             axis=1
         )
     
-    tasks_records = ws_tasks.get_all_records()
-    df_tasks = pd.DataFrame(tasks_records)
+    # Load Tasks
+    if "tasks_data" not in st.session_state:
+        st.session_state.tasks_data = ws_tasks.get_all_records()
+        
+    df_tasks = pd.DataFrame(st.session_state.tasks_data)
     existing_task_ids = df_tasks['Task_ID'].astype(str).tolist() if not df_tasks.empty else []
     
     new_tasks_to_add = []
+    new_tasks_for_state = []
     
     for idx, row in df_data.iterrows():
         ten = str(row.get('Tên', '')).strip()
@@ -146,16 +144,26 @@ def load_and_sync_tasks():
         for t_date, t_name in tasks_to_create:
             task_id = f"{ten}_{t_date.strftime('%Y%m%d')}_{t_name}"
             if task_id not in existing_task_ids:
-                new_tasks_to_add.append([
+                row_data = [
                     task_id, t_date.strftime("%d/%m/%Y"), ten, tp, loai_banh, t_name,
                     str(row.get('Tên trên thiệp/ bánh', '')), str(row.get('DT', '')), 
                     str(row.get('Địa chỉ', '')), str(row.get('Lưu ý', '')), "Chưa hoàn thành"
-                ])
+                ]
+                new_tasks_to_add.append(row_data)
+                
+                # Tạo dict để nhét vào RAM
+                new_tasks_for_state.append({
+                    "Task_ID": task_id, "Ngày thực hiện": row_data[1], "Tên người nhận": ten,
+                    "TP": tp, "Loại bánh": loai_banh, "Tên Task": t_name,
+                    "Tên trên thiệp": row_data[6], "SĐT": row_data[7], "Địa chỉ": row_data[8],
+                    "Lưu ý": row_data[9], "Trạng thái": "Chưa hoàn thành"
+                })
                 existing_task_ids.append(task_id)
                 
     if new_tasks_to_add:
         ws_tasks.append_rows(new_tasks_to_add)
-        df_tasks = pd.DataFrame(ws_tasks.get_all_records())
+        st.session_state.tasks_data.extend(new_tasks_for_state)
+        df_tasks = pd.DataFrame(st.session_state.tasks_data)
         
     return df_tasks
 
@@ -167,33 +175,30 @@ df_tasks = load_and_sync_tasks()
 df_tasks['Ngày thực hiện'] = pd.to_datetime(df_tasks['Ngày thực hiện'], format="%d/%m/%Y", errors='coerce')
 today = datetime.today().date()
 
-# Overdue logic hiện lên top
+# Overdue logic
 overdue_tasks = df_tasks[(df_tasks['Ngày thực hiện'].dt.date < today) & (df_tasks['Trạng thái'] != "Hoàn thành")]
 if not overdue_tasks.empty:
     for _, r in overdue_tasks.iterrows():
         st.markdown(f"<div class='overdue-alert'>⚠️ {r['Tên người nhận']} - {r['Tên Task']} đã quá deadline</div>", unsafe_allow_html=True)
 
-# 1. TASK MANAGEMENT (CALENDAR & TO-DO LIST)
+# 1. TASK MANAGEMENT
 st.markdown("<h2>TASK MANAGEMENT</h2>", unsafe_allow_html=True)
 tab_cal, tab_todo = st.tabs(["🗓️ LỊCH (CALENDAR)", "📋 TO-DO LIST (CHI TIẾT)"])
 
 with tab_cal:
-    # Setup data cho Calendar UI
     calendar_events = []
     for _, r in df_tasks.iterrows():
         prefix = r['Tên người nhận'] if r['Tên người nhận'] != "Khác" else "Khác"
         
-        # LOGIC MÀU SẮC CHO CALENDAR
         is_done = r['Trạng thái'] == "Hoàn thành"
-        # Đã xóa .dt ở dòng dưới
         is_overdue = r['Ngày thực hiện'].date() < today and not is_done
         
         if is_done:
-            bg_color = "#9E9E9E" # Màu xám cho task đã xong
+            bg_color = "#9E9E9E"
         elif is_overdue:
-            bg_color = "#E53935" # Màu đỏ cho task quá hạn
+            bg_color = "#E53935"
         else:
-            bg_color = "#D81B60" # Màu hồng cho task bình thường
+            bg_color = "#D81B60"
         
         calendar_events.append({
             "title": f"{prefix} | {r['Tên Task']}",
@@ -210,12 +215,9 @@ with tab_cal:
         },
         "initialView": "dayGridMonth"
     }
-
-    # Render Calendar
     calendar(events=calendar_events, options=calendar_options)
 
 with tab_todo:
-    # THÊM TAB OVERDUE
     sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3 = st.tabs(["⚠️ QUÁ HẠN", "🕒 HÔM NAY", "📆 TRONG VÒNG 8 NGÀY", "📅 TRONG VÒNG 1 THÁNG"])
     
     def render_task_list(df_filter, tab_key_suffix):
@@ -244,11 +246,14 @@ with tab_todo:
             if checked != is_done:
                 new_val = "Hoàn thành" if checked else "Chưa hoàn thành"
                 
-                # TỐI ƯU 2: Tính thẳng số dòng trên sheet từ index của DataFrame (Bỏ lệnh find() tốn API)
-                row_in_sheet = idx + 2 # Dòng 1 là tiêu đề, data bắt đầu từ dòng 2
+                # Push lên Google Sheets
+                row_in_sheet = idx + 2
                 ws_tasks.update_cell(row_in_sheet, 11, new_val)
-                st.rerun()
                 
+                # Sync vào RAM để khỏi load lại API
+                st.session_state.tasks_data[idx]['Trạng thái'] = new_val
+                st.rerun()
+
     with sub_tab_0:
         render_task_list(overdue_tasks, "overdue")
     with sub_tab_1:
@@ -283,6 +288,13 @@ with st.form("add_task_form"):
             new_id, task_date.strftime("%d/%m/%Y"), belong_to, tp, loai, task_name,
             thiep, sdt, diachi, luuy, "Chưa hoàn thành"
         ])
+        
+        # Sync vào RAM ngay lập tức
+        st.session_state.tasks_data.append({
+            "Task_ID": new_id, "Ngày thực hiện": task_date.strftime("%d/%m/%Y"), 
+            "Tên người nhận": belong_to, "TP": tp, "Loại bánh": loai, "Tên Task": task_name,
+            "Tên trên thiệp": thiep, "SĐT": sdt, "Địa chỉ": diachi, "Lưu ý": luuy, "Trạng thái": "Chưa hoàn thành"
+        })
         st.success("Tạo task thành công!")
         st.rerun()
 
