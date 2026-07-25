@@ -140,7 +140,7 @@ st.markdown("""
         border-left: 5px solid rgba(171, 71, 188, 0.8);
     }
 
-    /* CSS CHO HEADER TPHCM VÀ KHÁC */
+    /* CSS CHO HEADER TPHCM VÀ KHÁC LÚC Ở LAPTOP MODE */
     .loc-header-tphcm {
         background-color: #555555; 
         color: white;
@@ -535,16 +535,16 @@ with st.form("add_task_form", clear_on_submit=True):
 st.write("---")
 
 # ==========================================
-# 3. OVERALL PROCESS (UPDATE: CHỌN VIEW MODE)
+# 3. OVERALL PROCESS (UPDATE COMPACT + ĐẾM TỔNG)
 # ==========================================
 st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
 
 # Lựa chọn View Mode
 view_mode = st.selectbox(
     "👁️ CHỌN GÓC NHÌN TỔNG QUAN (VIEW MODE):", 
-    ["💻 Giao diện Laptop (Lưới ngang trọn vẹn)", 
-     "📱 Giao diện Mobile (Gom nhóm theo Trạng Thái)", 
-     "📱 Giao diện Mobile (Gom nhóm theo Tháng)"]
+    ["💻 Laptop mode", 
+     "📱 Mobile mode - Status Focused", 
+     "📱 Mobile mode - Time Focused"]
 )
 st.write("")
 
@@ -593,12 +593,11 @@ if not df_sum.empty:
         sorted_months.append("Không rõ")
         
     df_final = pd.concat([df_valid, df_invalid])
-    current_month_dt = datetime.today().replace(day=1)
 
     # ---------------------------------------------------------
-    # VIEW 1: LAPTOP (Lưới ngang)
+    # VIEW 1: LAPTOP MODE
     # ---------------------------------------------------------
-    if "Laptop" in view_mode:
+    if "Laptop mode" in view_mode:
         status_cols = st.columns(3)
         with status_cols[0]: st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
         with status_cols[1]: st.markdown("<div class='process-box'>🚀 IN PROGRESS</div>", unsafe_allow_html=True)
@@ -621,14 +620,7 @@ if not df_sum.empty:
         with sub_cols[5]: st.markdown(f"<div class='loc-header-khac'>KHÁC ({c_cp_khac})</div>", unsafe_allow_html=True)
 
         for month in sorted_months:
-            is_expanded = True
-            if month != "Không rõ":
-                try:
-                    m_dt = datetime.strptime(month, "%m/%Y")
-                    if m_dt.date() < current_month_dt: is_expanded = False
-                except: pass
-                
-            with st.expander(f"Tháng {month}", expanded=is_expanded):
+            with st.expander(f"Tháng {month}", expanded=False):
                 m_cols = st.columns(6)
                 col_mapping = {
                     ("Not Yet", "TP.HCM"): 0, ("Not Yet", "KHÁC"): 1,
@@ -648,30 +640,26 @@ if not df_sum.empty:
                                     show_detail_dialog(row['Name'])
 
     # ---------------------------------------------------------
-    # VIEW 2: MOBILE (Focus theo Trạng Thái)
+    # VIEW 2: MOBILE (Status Focused)
     # ---------------------------------------------------------
-    elif "Trạng Thái" in view_mode:
+    elif "Status Focused" in view_mode:
         tab_ny, tab_ip, tab_cp = st.tabs(["⏳ NOT YET", "🚀 IN PROGRESS", "✅ COMPLETED"])
         
-        def render_mobile_status_view(status_name, tab_key):
-            c_tphcm = len(df_final[(df_final['Status'] == status_name) & (df_final['Loc'] == 'TP.HCM')])
-            c_khac = len(df_final[(df_final['Status'] == status_name) & (df_final['Loc'] == 'KHÁC')])
-            
-            c1, c2 = st.columns(2)
-            with c1: st.markdown(f"<div class='loc-header-tphcm'>TP.HCM ({c_tphcm})</div>", unsafe_allow_html=True)
-            with c2: st.markdown(f"<div class='loc-header-khac'>KHÁC ({c_khac})</div>", unsafe_allow_html=True)
-            
+        def render_mobile_status_view(status_name):
             for month in sorted_months:
-                subset_month = df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == status_name)]
-                if not subset_month.empty:
-                    is_expanded = True
-                    if month != "Không rõ":
-                        try:
-                            m_dt = datetime.strptime(month, "%m/%Y")
-                            if m_dt.date() < current_month_dt: is_expanded = False
-                        except: pass
-                    
-                    with st.expander(f"Tháng {month}", expanded=is_expanded):
+                # Tính B (Tổng đơn trong tháng đó)
+                total_month = len(df_final[df_final['Month_Str'] == month])
+                if total_month == 0: continue
+                
+                # Tính A (Số lượng đơn đang ở trạng thái status_name trong tháng đó)
+                count_status = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == status_name)])
+                
+                # Hiển thị xx/yy (A/B)
+                with st.expander(f"Tháng {month} ({count_status}/{total_month})", expanded=False):
+                    if count_status == 0:
+                        st.info(f"Không có đơn nào đang {status_name} trong tháng này.")
+                    else:
+                        subset_month = df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == status_name)]
                         for loc in ["TP.HCM", "KHÁC"]:
                             subset_loc = subset_month[subset_month['Loc'] == loc]
                             if not subset_loc.empty:
@@ -681,24 +669,24 @@ if not df_sum.empty:
                                     if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{status_name}_{loc}_m1", type="secondary", use_container_width=True):
                                         show_detail_dialog(row['Name'])
 
-        with tab_ny: render_mobile_status_view("Not Yet", "ny")
-        with tab_ip: render_mobile_status_view("In Progress", "ip")
-        with tab_cp: render_mobile_status_view("Completed", "cp")
+        with tab_ny: render_mobile_status_view("Not Yet")
+        with tab_ip: render_mobile_status_view("In Progress")
+        with tab_cp: render_mobile_status_view("Completed")
 
     # ---------------------------------------------------------
-    # VIEW 3: MOBILE (Focus theo Tháng)
+    # VIEW 3: MOBILE (Time Focused)
     # ---------------------------------------------------------
-    elif "Tháng" in view_mode:
+    elif "Time Focused" in view_mode:
         for month in sorted_months:
-            is_expanded = True
-            if month != "Không rõ":
-                try:
-                    m_dt = datetime.strptime(month, "%m/%Y")
-                    if m_dt.date() < current_month_dt: is_expanded = False
-                except: pass
+            total_month = len(df_final[df_final['Month_Str'] == month])
             
-            with st.expander(f"Tháng {month}", expanded=is_expanded):
-                t_ny, t_ip, t_cp = st.tabs(["⏳ NOT YET", "🚀 IN PROGRESS", "✅ COMPLETED"])
+            with st.expander(f"Tháng {month} ({total_month})", expanded=False):
+                count_ny = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == 'Not Yet')])
+                count_ip = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == 'In Progress')])
+                count_cp = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == 'Completed')])
+                
+                # Hiện số count của trạng thái ngay trên thẻ tab của tháng đó
+                t_ny, t_ip, t_cp = st.tabs([f"⏳ NOT YET ({count_ny})", f"🚀 IN PROGRESS ({count_ip})", f"✅ COMPLETED ({count_cp})"])
                 
                 def render_month_status(status_name):
                     subset = df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == status_name)]
@@ -733,6 +721,7 @@ if "notes_data" not in st.session_state:
 
 note_col1, note_col2 = st.columns([1, 2])
 
+# Form tạo Note
 with note_col1:
     with st.form("add_note_form", clear_on_submit=True):
         note_text = st.text_area("Nhập nội dung Note:", height=150)
@@ -748,6 +737,7 @@ with note_col1:
             time.sleep(1.2)
             st.rerun()
 
+# Hiển thị và Edit Note
 with note_col2:
     if not st.session_state.notes_data:
         st.info("Chưa có note nào. Hãy tạo note đầu tiên!")
