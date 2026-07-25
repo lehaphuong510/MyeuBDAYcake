@@ -1,0 +1,31 @@
+name: Daily Telegram Notification
+
+on:
+  schedule:
+    # Cấu hình giờ chạy. Giờ máy chủ là UTC. VN là GMT+7.
+    # Nên 1:00 UTC nghĩa là 8:00 sáng giờ Việt Nam.
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Nút để m có thể bấm chạy thử bằng tay lúc nào cũng được
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lấy code về
+        uses: actions/checkout@v3
+
+      - name: Cài đặt Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Cài đặt thư viện
+        run: |
+          pip install gspread pandas requests google-auth
+
+      - name: Chạy script thông báo
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        run: python telegram_notifier.py
