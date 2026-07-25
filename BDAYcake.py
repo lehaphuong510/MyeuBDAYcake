@@ -16,7 +16,6 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-transform: uppercase;
-        /* Trả lại nowrap để không bao giờ bị rớt dòng ngẫu nhiên */
         white-space: nowrap; 
         text-align: left;
         font-weight: bold;
@@ -27,7 +26,7 @@ st.markdown("""
         font-size: 1.1rem;
     }
     
-    /* CSS cho Task Box - Click xổ ra */
+    /* CSS cho Task Box */
     .task-box {
         border-left: 5px solid #D81B60;
         background-color: #fcfcfc;
@@ -43,14 +42,8 @@ st.markdown("""
         cursor: pointer;
         outline: none;
     }
-    /* Ẩn mũi tên mặc định của thẻ details */
-    details > summary {
-        list-style: none; 
-    }
-    details > summary::-webkit-details-marker {
-        display: none;
-    }
-    /* Tạo mũi tên tuỳ chỉnh */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
     .task-title::before {
         content: "▶";
         display: inline-block;
@@ -59,10 +52,7 @@ st.markdown("""
         font-size: 0.8em;
         transition: transform 0.2s ease;
     }
-    /* Xoay mũi tên khi mở ra */
-    details[open] > .task-title::before {
-        transform: rotate(90deg);
-    }
+    details[open] > .task-title::before { transform: rotate(90deg); }
     .task-content {
         margin-top: 12px;
         padding-top: 12px;
@@ -71,31 +61,37 @@ st.markdown("""
         line-height: 1.6;
     }
     
-    .stButton>button {
-        background: linear-gradient(to right, #D81B60, #8E24AA);
-        color: white;
-        text-transform: uppercase;
-        font-weight: bold;
-        border: none;
+    /* ========================================= */
+    /* TÁCH BIỆT NÚT CHÍNH VÀ NÚT PHỤ (VIỀN)     */
+    /* ========================================= */
+    
+    /* 1. NÚT CHÍNH (PRIMARY): Bôi màu Gradient (Làm mới, Create Task, Create Note...) */
+    div.stButton > button[kind="primary"], div.stFormSubmitButton > button {
+        background: linear-gradient(to right, #D81B60, #8E24AA) !important;
+        color: white !important;
+        text-transform: uppercase !important;
+        font-weight: bold !important;
+        border: none !important;
+        transition: 0.3s;
+    }
+    div.stButton > button[kind="primary"]:hover, div.stFormSubmitButton > button:hover {
+        opacity: 0.85 !important;
     }
 
-    /* TÍNH NĂNG MỚI: Style cho các nút giả text ở Overall Process */
-    .stealth-btn button {
+    /* 2. NÚT PHỤ (SECONDARY): Chỉ có Viền (Các tên người trong Overall Process) */
+    div.stButton > button[kind="secondary"] {
         background: transparent !important;
-        color: #4A148C !important;
-        border: none !important;
-        box-shadow: none !important;
-        text-transform: none !important;
+        color: #8E24AA !important;
+        border: 1.5px solid #D81B60 !important; /* Viền mỏng màu hồng */
         font-weight: bold !important;
-        text-align: left !important;
-        padding: 5px 0 !important;
-        font-size: 1.05rem !important;
-        transition: all 0.2s ease;
+        border-radius: 8px !important;
+        transition: all 0.3s ease !important;
     }
-    .stealth-btn button:hover {
+    div.stButton > button[kind="secondary"]:hover {
+        background: rgba(216, 27, 96, 0.05) !important; /* Nền highlight siêu mờ */
         color: #D81B60 !important;
-        background: transparent !important;
-        transform: translateX(5px);
+        border-color: #8E24AA !important; /* Đổi màu viền khi hover */
+        transform: translateY(-2px);
     }
 
     .process-box {
@@ -118,7 +114,6 @@ st.markdown("""
         border-left: 5px solid #c62828;
     }
     
-    /* CSS cho thanh Agenda (Sidebar) */
     .agenda-link {
         display: block;
         padding: 10px 15px;
@@ -138,7 +133,6 @@ st.markdown("""
         text-decoration: none !important;
     }
 
-    /* CSS cho Note: Độ trong suốt 50% */
     .note-box {
         background: linear-gradient(to right, rgba(248, 187, 208, 0.5), rgba(225, 190, 231, 0.5));
         backdrop-filter: blur(10px);
@@ -151,39 +145,14 @@ st.markdown("""
         border-left: 5px solid rgba(171, 71, 188, 0.8);
     }
 
-    /* ========================================= */
-    /* RESPONSIVE TRÊN MOBILE: "ÉP CÂN" FONT CHỮ */
-    /* ========================================= */
     @media (max-width: 768px) {
-        h1 {
-            font-size: 6.5vw !important; /* Chữ to nhất tự scale theo màn hình */
-        }
-        h2 {
-            font-size: 5.5vw !important; /* Tiêu đề thẻ tự scale */
-        }
-        h3, h4 {
-            font-size: 4.5vw !important;
-        }
-        
-        /* Cân đối lại lịch trên mobile */
-        .fc .fc-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center !important;
-            gap: 10px;
-        }
-        .fc .fc-toolbar-chunk {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-        }
-        .fc .fc-toolbar-title {
-            font-size: 1.5rem !important;
-        }
-        .fc .fc-button {
-            font-size: 0.85rem !important;
-            padding: 0.3em 0.6em !important;
-        }
+        h1 { font-size: 6.5vw !important; }
+        h2 { font-size: 5.5vw !important; }
+        h3, h4 { font-size: 4.5vw !important; }
+        .fc .fc-toolbar { display: flex; flex-wrap: wrap; justify-content: center !important; gap: 10px; }
+        .fc .fc-toolbar-chunk { display: flex; justify-content: center; width: 100%; }
+        .fc .fc-toolbar-title { font-size: 1.5rem !important; }
+        .fc .fc-button { font-size: 0.85rem !important; padding: 0.3em 0.6em !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -191,7 +160,7 @@ st.markdown("""
 # --- NÚT REFRESH & AGENDA BÊN SIDEBAR ---
 with st.sidebar:
     st.markdown("### ⚙️ QUẢN TRỊ")
-    if st.button("🔄 LÀM MỚI DỮ LIỆU"):
+    if st.button("🔄 LÀM MỚI DỮ LIỆU", type="primary"):
         st.session_state.clear()
         st.rerun()
     st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets và muốn cập nhật lại.")
@@ -337,6 +306,14 @@ def show_detail_dialog(person_name):
     p_data = df_tasks[df_tasks['Tên người nhận'] == person_name].iloc[0]
     bday = st.session_state.birthday_map.get(person_name, "Không rõ")
     
+    # Tìm ngày giao bánh gốc từ Source Data
+    orig_df = pd.DataFrame(st.session_state.source_data)
+    p_orig = orig_df[orig_df['Tên'] == person_name]
+    ngay_giao = "Không rõ"
+    if not p_orig.empty:
+        ngay_giao = str(p_orig.iloc[0].get('Ngày giao bánh', 'Không rõ')).strip()
+        if not ngay_giao: ngay_giao = "Không rõ"
+    
     sdt = str(p_data['SĐT']).strip()
     if sdt.endswith('.0'): sdt = sdt[:-2]
     if sdt and not sdt.startswith('0') and sdt.isdigit(): sdt = '0' + sdt
@@ -348,6 +325,7 @@ def show_detail_dialog(person_name):
         <b>💌 Tên trên thiệp:</b> {p_data['Tên trên thiệp']}<br>
         <b>🏙️ Thành phố:</b> {p_data['TP']}<br>
         <b>🎂 Loại bánh:</b> {p_data['Loại bánh']}<br>
+        <b>🚚 Ngày giao bánh:</b> <span style='color:#8E24AA; font-weight: bold;'>{ngay_giao}</span><br>
         <b>🎈 Ngày sinh nhật:</b> {bday}<br>
         <b>📞 SĐT:</b> {sdt}<br>
         <b>🏠 Địa chỉ:</b> {p_data['Địa chỉ']}<br>
@@ -377,14 +355,10 @@ with tab_cal:
         task_name = str(r['Tên Task']).strip().lower()
         
         # ĐỔI MÀU GIAO BÁNH = TÍM
-        if is_done:
-            bg_color = "#9E9E9E" 
-        elif is_overdue:
-            bg_color = "#c62828" 
-        elif task_name == "giao bánh":
-            bg_color = "#8E24AA"  
-        else:
-            bg_color = "#D81B60"  
+        if is_done: bg_color = "#9E9E9E" 
+        elif is_overdue: bg_color = "#c62828" 
+        elif task_name == "giao bánh": bg_color = "#8E24AA"  
+        else: bg_color = "#D81B60"  
         
         calendar_events.append({
             "title": f"{prefix} | {r['Tên Task']}",
@@ -404,7 +378,6 @@ with tab_cal:
     
     # CSS Tùy chỉnh lịch
     custom_calendar_css = """
-    /* Reset chung */
     .fc .fc-button-primary { background-image: none !important; border: none !important; box-shadow: none !important; text-transform: uppercase !important; font-weight: bold !important; }
     .fc .fc-today-button { background-color: transparent !important; color: #D81B60 !important; border: none !important; }
     .fc .fc-today-button:disabled { opacity: 0.5 !important; }
@@ -414,7 +387,6 @@ with tab_cal:
     .fc .fc-dayGridMonth-button.fc-button-active, .fc .fc-timeGridWeek-button.fc-button-active { background-color: #D81B60 !important; }
     """
     
-    # BẮT SỰ KIỆN CLICK TRÊN LỊCH ĐỂ GỌI POP-UP
     cal_widget = calendar(events=calendar_events, options=calendar_options, custom_css=custom_calendar_css, key="main_calendar")
     
     if cal_widget.get("callback") == "eventClick":
@@ -425,12 +397,7 @@ with tab_cal:
 
 with tab_todo:
     sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3, sub_tab_4, sub_tab_5 = st.tabs([
-        "⚠️ QUÁ HẠN", 
-        "🕒 HÔM NAY", 
-        "🌅 NGÀY MAI", 
-        "⏳ TRONG VÒNG 4 NGÀY", 
-        "📆 TRONG VÒNG 8 NGÀY", 
-        "📅 TRONG VÒNG 1 THÁNG"
+        "⚠️ QUÁ HẠN", "🕒 HÔM NAY", "🌅 NGÀY MAI", "⏳ TRONG VÒNG 4 NGÀY", "📆 TRONG VÒNG 8 NGÀY", "📅 TRONG VÒNG 1 THÁNG"
     ])
     
     def render_task_list(df_filter, tab_key_suffix):
@@ -450,8 +417,7 @@ with tab_todo:
             
             sdt_hien_thi = str(r['SĐT']).strip()
             if sdt_hien_thi.endswith('.0'): sdt_hien_thi = sdt_hien_thi[:-2]
-            if sdt_hien_thi and not sdt_hien_thi.startswith('0') and sdt_hien_thi.isdigit():
-                sdt_hien_thi = '0' + sdt_hien_thi
+            if sdt_hien_thi and not sdt_hien_thi.startswith('0') and sdt_hien_thi.isdigit(): sdt_hien_thi = '0' + sdt_hien_thi
             
             st.markdown(f"""
             <div class='task-box'>
@@ -498,7 +464,7 @@ with st.form("add_task_form", clear_on_submit=True):
     task_date = st.date_input("Ngày thực hiện")
     task_name = st.text_input("Task (Fill vào)")
     
-    submitted = st.form_submit_button("CREATE TASK")
+    submitted = st.form_submit_button("CREATE TASK", type="primary")
     msg_placeholder = st.empty() 
     
     if submitted and task_name:
@@ -507,11 +473,9 @@ with st.form("add_task_form", clear_on_submit=True):
             sample = df_tasks[df_tasks['Tên người nhận'] == belong_to].iloc[0]
             tp, loai, thiep = sample['TP'], sample['Loại bánh'], sample['Tên trên thiệp']
             diachi, luuy = sample['Địa chỉ'], sample['Lưu ý']
-            
             sdt = str(sample['SĐT']).strip()
             if sdt.endswith('.0'): sdt = sdt[:-2]
-            if sdt and not sdt.startswith('0') and sdt.isdigit():
-                sdt = '0' + sdt
+            if sdt and not sdt.startswith('0') and sdt.isdigit(): sdt = '0' + sdt
             
         new_id = f"Manual_{belong_to}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
@@ -545,34 +509,25 @@ not_yet, in_progress, completed = [], [], []
 for name, group in grouped:
     total = len(group)
     done = len(group[group['Trạng thái'] == "Hoàn thành"])
-    if done == 0:
-        not_yet.append(name)
-    elif done == total:
-        completed.append(name)
-    else:
-        in_progress.append(name)
+    if done == 0: not_yet.append(name)
+    elif done == total: completed.append(name)
+    else: in_progress.append(name)
 
-# UPDATE: Thay vì in text thì dùng button tàng hình gọi Pop-up
+# Các nút tên người dùng type="secondary" để nhận CSS hiển thị viền
 with process_cols[0]:
     st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
-    st.markdown("<div class='stealth-btn'>", unsafe_allow_html=True)
     for n in not_yet:
-        if st.button(f"▪ {n}", key=f"btn_{n}_notyet"): show_detail_dialog(n)
-    st.markdown("</div>", unsafe_allow_html=True)
+        if st.button(n, key=f"btn_{n}_notyet", type="secondary", use_container_width=True): show_detail_dialog(n)
         
 with process_cols[1]:
     st.markdown("<div class='process-box'>🚀 IN PROGRESS</div>", unsafe_allow_html=True)
-    st.markdown("<div class='stealth-btn'>", unsafe_allow_html=True)
     for n in in_progress:
-        if st.button(f"▪ {n}", key=f"btn_{n}_inprogress"): show_detail_dialog(n)
-    st.markdown("</div>", unsafe_allow_html=True)
+        if st.button(n, key=f"btn_{n}_inprogress", type="secondary", use_container_width=True): show_detail_dialog(n)
         
 with process_cols[2]:
     st.markdown("<div class='process-box'>✅ COMPLETED</div>", unsafe_allow_html=True)
-    st.markdown("<div class='stealth-btn'>", unsafe_allow_html=True)
     for n in completed:
-        if st.button(f"▪ {n}", key=f"btn_{n}_completed"): show_detail_dialog(n)
-    st.markdown("</div>", unsafe_allow_html=True)
+        if st.button(n, key=f"btn_{n}_completed", type="secondary", use_container_width=True): show_detail_dialog(n)
 
 st.write("---")
 
@@ -590,7 +545,7 @@ note_col1, note_col2 = st.columns([1, 2])
 with note_col1:
     with st.form("add_note_form", clear_on_submit=True):
         note_text = st.text_area("Nhập nội dung Note:", height=150)
-        note_submitted = st.form_submit_button("CREATE NOTE")
+        note_submitted = st.form_submit_button("CREATE NOTE", type="primary")
         note_msg = st.empty()
         
         if note_submitted and note_text:
@@ -619,13 +574,13 @@ with note_col2:
             if f"edit_mode_{idx}" not in st.session_state:
                 st.session_state[f"edit_mode_{idx}"] = False
                 
-            if st.button("✏️ Edit Note", key=f"btn_edit_{idx}"):
+            if st.button("✏️ Edit Note", key=f"btn_edit_{idx}", type="secondary"):
                 st.session_state[f"edit_mode_{idx}"] = not st.session_state[f"edit_mode_{idx}"]
                 st.rerun()
                 
             if st.session_state[f"edit_mode_{idx}"]:
                 new_note_content = st.text_area("Sửa nội dung:", value=n.get('Nội dung Note', ''), key=f"text_edit_{idx}")
-                if st.button("Lưu thay đổi", key=f"save_note_{idx}"):
+                if st.button("Lưu thay đổi", key=f"save_note_{idx}", type="primary"):
                     ws_notes.update_cell(idx + 2, 2, new_note_content)
                     st.session_state.notes_data[idx]['Nội dung Note'] = new_note_content
                     st.session_state[f"edit_mode_{idx}"] = False 
