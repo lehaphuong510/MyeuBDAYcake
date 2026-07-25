@@ -162,6 +162,30 @@ st.markdown("""
         margin-bottom: 10px;
         font-size: 0.9em;
     }
+    
+    /* CSS RIÊNG CHO LAYOUT OVERALL PROCESS LAPTOP */
+    .month-label {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        background-color: #757575; 
+        color: white;
+        text-align: center;
+        padding: 20px 5px;
+        border-radius: 8px;
+        font-weight: bold;
+        height: 100%;
+        min-height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1em;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+    }
+    .dotted-line {
+        border-bottom: 2px dotted #9E9E9E;
+        margin: 20px 0;
+    }
 
     @media (max-width: 768px) {
         h1 { font-size: 6.5vw !important; }
@@ -706,32 +730,32 @@ if not df_sum.empty:
 
         fig = go.Figure()
 
-        # Cột Stacked (Màu tím nhạt -> tím đậm)
+        # Cột Stacked (Màu gradient tuỳ chỉnh theo ý user)
         fig.add_trace(go.Bar(
             x=chart_months, y=ny_counts, name='Not Yet',
-            marker_color='#E1BEE7', # Tím nhạt
+            marker_color='#f7daec', 
             text=text_ny, textposition='auto'
         ))
         fig.add_trace(go.Bar(
             x=chart_months, y=ip_counts, name='In Progress',
-            marker_color='#AB47BC', # Tím vừa
+            marker_color='#ddc7e4', 
             text=text_ip, textposition='auto'
         ))
         fig.add_trace(go.Bar(
             x=chart_months, y=cp_counts, name='Completed',
-            marker_color='#4A148C', # Tím đậm
+            marker_color='#9963a3', 
             text=text_cp, textposition='auto'
         ))
 
-        # Đường Line (Tổng đơn) (Màu hồng đậm)
+        # Đường Line (Tổng đơn)
         fig.add_trace(go.Scatter(
             x=chart_months, y=total_counts, name='Total Orders',
             mode='lines+markers+text',
-            marker=dict(color='#D81B60', size=10),
-            line=dict(color='#D81B60', width=3),
+            marker=dict(color='#e374bc', size=10),
+            line=dict(color='#e374bc', width=1.5, dash='dash'), 
             text=text_total,
             textposition='top center',
-            textfont=dict(color='#D81B60', size=14)
+            textfont=dict(color='#e374bc', size=14)
         ))
 
         fig.update_layout(
