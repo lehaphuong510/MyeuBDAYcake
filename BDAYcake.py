@@ -4,6 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
+import plotly.graph_objects as go
 import time
 
 # --- CẤU HÌNH GIAO DIỆN & UX/UI ---
@@ -160,30 +161,6 @@ st.markdown("""
         padding: 6px;
         margin-bottom: 10px;
         font-size: 0.9em;
-    }
-    
-    /* CSS RIÊNG CHO LAYOUT OVERALL PROCESS LAPTOP */
-    .month-label {
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
-        background-color: #757575; 
-        color: white;
-        text-align: center;
-        padding: 20px 5px;
-        border-radius: 8px;
-        font-weight: bold;
-        height: 100%;
-        min-height: 120px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.1em;
-        letter-spacing: 2px;
-        margin-bottom: 10px;
-    }
-    .dotted-line {
-        border-bottom: 2px dotted #9E9E9E;
-        margin: 20px 0;
     }
 
     @media (max-width: 768px) {
@@ -535,7 +512,7 @@ with st.form("add_task_form", clear_on_submit=True):
 st.write("---")
 
 # ==========================================
-# 3. OVERALL PROCESS (UPDATE COMPACT + ĐẾM TỔNG)
+# 3. OVERALL PROCESS
 # ==========================================
 st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
 
@@ -647,14 +624,10 @@ if not df_sum.empty:
         
         def render_mobile_status_view(status_name):
             for month in sorted_months:
-                # Tính B (Tổng đơn trong tháng đó)
                 total_month = len(df_final[df_final['Month_Str'] == month])
                 if total_month == 0: continue
-                
-                # Tính A (Số lượng đơn đang ở trạng thái status_name trong tháng đó)
                 count_status = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == status_name)])
                 
-                # Hiển thị xx/yy (A/B)
                 with st.expander(f"Tháng {month} ({count_status}/{total_month})", expanded=False):
                     if count_status == 0:
                         st.info(f"Không có đơn nào đang {status_name} trong tháng này.")
@@ -685,7 +658,6 @@ if not df_sum.empty:
                 count_ip = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == 'In Progress')])
                 count_cp = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == 'Completed')])
                 
-                # Hiện số count của trạng thái ngay trên thẻ tab của tháng đó
                 t_ny, t_ip, t_cp = st.tabs([f"⏳ NOT YET ({count_ny})", f"🚀 IN PROGRESS ({count_ip})", f"✅ COMPLETED ({count_cp})"])
                 
                 def render_month_status(status_name):
@@ -705,6 +677,78 @@ if not df_sum.empty:
                 with t_ny: render_month_status("Not Yet")
                 with t_ip: render_month_status("In Progress")
                 with t_cp: render_month_status("Completed")
+
+    # ---------------------------------------------------------
+    # CHART: BIỂU ĐỒ THỐNG KÊ TIẾN ĐỘ (REAL-TIME)
+    # ---------------------------------------------------------
+    st.write("---")
+    st.markdown("### 📊 BIỂU ĐỒ THỐNG KÊ TRẠNG THÁI THEO THÁNG")
+    
+    chart_months = [m for m in sorted_months if m != "Không rõ"]
+    if chart_months:
+        ny_counts, ip_counts, cp_counts, total_counts = [], [], [], []
+        
+        for m in chart_months:
+            ny = len(df_final[(df_final['Month_Str'] == m) & (df_final['Status'] == 'Not Yet')])
+            ip = len(df_final[(df_final['Month_Str'] == m) & (df_final['Status'] == 'In Progress')])
+            cp = len(df_final[(df_final['Month_Str'] == m) & (df_final['Status'] == 'Completed')])
+            
+            ny_counts.append(ny)
+            ip_counts.append(ip)
+            cp_counts.append(cp)
+            total_counts.append(ny + ip + cp)
+            
+        # Ẩn số 0 trên label cho đẹp chart
+        text_ny = [v if v > 0 else "" for v in ny_counts]
+        text_ip = [v if v > 0 else "" for v in ip_counts]
+        text_cp = [v if v > 0 else "" for v in cp_counts]
+        text_total = [v if v > 0 else "" for v in total_counts]
+
+        fig = go.Figure()
+
+        # Cột Stacked (Màu tím nhạt -> tím đậm)
+        fig.add_trace(go.Bar(
+            x=chart_months, y=ny_counts, name='Not Yet',
+            marker_color='#E1BEE7', # Tím nhạt
+            text=text_ny, textposition='auto'
+        ))
+        fig.add_trace(go.Bar(
+            x=chart_months, y=ip_counts, name='In Progress',
+            marker_color='#AB47BC', # Tím vừa
+            text=text_ip, textposition='auto'
+        ))
+        fig.add_trace(go.Bar(
+            x=chart_months, y=cp_counts, name='Completed',
+            marker_color='#4A148C', # Tím đậm
+            text=text_cp, textposition='auto'
+        ))
+
+        # Đường Line (Tổng đơn) (Màu hồng đậm)
+        fig.add_trace(go.Scatter(
+            x=chart_months, y=total_counts, name='Total Orders',
+            mode='lines+markers+text',
+            marker=dict(color='#D81B60', size=10),
+            line=dict(color='#D81B60', width=3),
+            text=text_total,
+            textposition='top center',
+            textfont=dict(color='#D81B60', size=14)
+        ))
+
+        fig.update_layout(
+            barmode='stack',
+            xaxis_title="Tháng",
+            yaxis_title="Số lượng đơn hàng",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            plot_bgcolor='rgba(0,0,0,0)', 
+            height=450,
+            margin=dict(l=20, r=20, t=50, b=20)
+        )
+        fig.update_xaxes(showgrid=False)
+        fig.update_yaxes(showgrid=True, gridcolor='rgba(200, 200, 200, 0.2)')
+
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Chưa có đủ dữ liệu theo tháng để vẽ biểu đồ.")
 
 else:
     st.info("Chưa có người nhận nào trên hệ thống.")
