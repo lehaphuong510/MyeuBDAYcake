@@ -100,7 +100,7 @@ st.markdown("""
         text-align: center;
         font-weight: bold;
         font-size: 1.2em;
-        margin-bottom: 15px;
+        margin-bottom: 5px;
     }
     .overdue-alert {
         background-color: #ffebee;
@@ -143,38 +143,26 @@ st.markdown("""
         border-left: 5px solid rgba(171, 71, 188, 0.8);
     }
 
-    /* CSS RIÊNG CHO LAYOUT OVERALL PROCESS MỚI */
-    .month-label {
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
-        background-color: #757575; /* Màu xám như mockup */
-        color: white;
-        text-align: center;
-        padding: 20px 5px;
-        border-radius: 8px;
-        font-weight: bold;
-        height: 100%;
-        min-height: 120px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.1em;
-        letter-spacing: 2px;
-        margin-bottom: 10px;
-    }
-    .loc-header {
-        background-color: #757575;
+    /* CSS CHO HEADER TPHCM VÀ KHÁC */
+    .loc-header-tphcm {
+        background-color: #555555; /* Xám đậm */
         color: white;
         text-align: center;
         border-radius: 5px;
         font-weight: bold;
-        padding: 5px;
+        padding: 6px;
         margin-bottom: 10px;
         font-size: 0.9em;
     }
-    .dotted-line {
-        border-bottom: 2px dotted #9E9E9E;
-        margin: 20px 0;
+    .loc-header-khac {
+        background-color: #D81B60; /* Hồng đậm theo Calendar */
+        color: white;
+        text-align: center;
+        border-radius: 5px;
+        font-weight: bold;
+        padding: 6px;
+        margin-bottom: 10px;
+        font-size: 0.9em;
     }
 
     @media (max-width: 768px) {
@@ -529,11 +517,10 @@ with st.form("add_task_form", clear_on_submit=True):
 st.write("---")
 
 # ==========================================
-# 3. OVERALL PROCESS (UPDATE MỚI NHẤT)
+# 3. OVERALL PROCESS (UPDATE COMPACT + ĐẾM TỔNG)
 # ==========================================
 st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
 
-# Chuẩn bị Data tổng quan cho từng người
 person_summary = []
 orig_df = pd.DataFrame(st.session_state.source_data) if 'source_data' in st.session_state else pd.DataFrame()
 
@@ -548,7 +535,6 @@ for name, group in df_tasks.groupby('Tên người nhận'):
     loc = "TP.HCM" if tp_val == "TPHCM" else "KHÁC"
     loai_banh = str(group['Loại bánh'].iloc[0]).strip() if 'Loại bánh' in group.columns else ""
     
-    # Móc ngày giao bánh gốc để chia tháng
     month_dt = None
     if not orig_df.empty:
         p_orig = orig_df[orig_df['Tên'] == name]
@@ -556,21 +542,16 @@ for name, group in df_tasks.groupby('Tên người nhận'):
             ngay_giao = str(p_orig.iloc[0].get('Ngày giao bánh', '')).strip()
             try:
                 month_dt = datetime.strptime(ngay_giao, "%d/%m/%Y")
-            except:
-                pass
+            except: pass
                 
     person_summary.append({
-        "Name": name,
-        "Status": status,
-        "Loc": loc,
-        "Loại bánh": loai_banh,
-        "Month_DT": month_dt
+        "Name": name, "Status": status, "Loc": loc,
+        "Loại bánh": loai_banh, "Month_DT": month_dt
     })
 
 df_sum = pd.DataFrame(person_summary)
 
 if not df_sum.empty:
-    # Xử lý format tháng và sort
     df_valid = df_sum[df_sum['Month_DT'].notnull()].copy()
     df_invalid = df_sum[df_sum['Month_DT'].isnull()].copy()
     
@@ -587,54 +568,72 @@ if not df_sum.empty:
     df_final = pd.concat([df_valid, df_invalid])
     
     # 3.1 Dàn Tiêu Đề Bảng Trạng Thái
-    top_cols = st.columns([1, 11])
-    with top_cols[1]:
-        header_cols = st.columns(3)
-        with header_cols[0]: st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
-        with header_cols[1]: st.markdown("<div class='process-box'>🚀 IN PROGRESS</div>", unsafe_allow_html=True)
-        with header_cols[2]: st.markdown("<div class='process-box'>✅ COMPLETED</div>", unsafe_allow_html=True)
+    status_cols = st.columns(3)
+    with status_cols[0]: st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
+    with status_cols[1]: st.markdown("<div class='process-box'>🚀 IN PROGRESS</div>", unsafe_allow_html=True)
+    with status_cols[2]: st.markdown("<div class='process-box'>✅ COMPLETED</div>", unsafe_allow_html=True)
         
-    # 3.2 Render Box Từng Tháng
+    # 3.2 Hàng Header Địa Điểm Kèm Bộ Đếm Tổng Ngay Bên Dưới (Không lặp lại ở mỗi tháng)
+    sub_cols = st.columns(6)
+    
+    # Đếm số lượng Not Yet
+    c_ny_tphcm = len(df_final[(df_final['Status'] == 'Not Yet') & (df_final['Loc'] == 'TP.HCM')])
+    c_ny_khac = len(df_final[(df_final['Status'] == 'Not Yet') & (df_final['Loc'] == 'KHÁC')])
+    with sub_cols[0]: st.markdown(f"<div class='loc-header-tphcm'>TP.HCM ({c_ny_tphcm})</div>", unsafe_allow_html=True)
+    with sub_cols[1]: st.markdown(f"<div class='loc-header-khac'>KHÁC ({c_ny_khac})</div>", unsafe_allow_html=True)
+    
+    # Đếm số lượng In Progress
+    c_ip_tphcm = len(df_final[(df_final['Status'] == 'In Progress') & (df_final['Loc'] == 'TP.HCM')])
+    c_ip_khac = len(df_final[(df_final['Status'] == 'In Progress') & (df_final['Loc'] == 'KHÁC')])
+    with sub_cols[2]: st.markdown(f"<div class='loc-header-tphcm'>TP.HCM ({c_ip_tphcm})</div>", unsafe_allow_html=True)
+    with sub_cols[3]: st.markdown(f"<div class='loc-header-khac'>KHÁC ({c_ip_khac})</div>", unsafe_allow_html=True)
+    
+    # Đếm số lượng Completed
+    c_cp_tphcm = len(df_final[(df_final['Status'] == 'Completed') & (df_final['Loc'] == 'TP.HCM')])
+    c_cp_khac = len(df_final[(df_final['Status'] == 'Completed') & (df_final['Loc'] == 'KHÁC')])
+    with sub_cols[4]: st.markdown(f"<div class='loc-header-tphcm'>TP.HCM ({c_cp_tphcm})</div>", unsafe_allow_html=True)
+    with sub_cols[5]: st.markdown(f"<div class='loc-header-khac'>KHÁC ({c_cp_khac})</div>", unsafe_allow_html=True)
+
+    # 3.3 Render Danh Sách Người Từng Tháng Bằng st.expander
+    current_month_dt = datetime.today().replace(day=1) # Chốt ngày 1 tháng hiện tại để so sánh
+
     for month in sorted_months:
-        row_cols = st.columns([1, 11])
+        is_expanded = True # Mặc định mở
         
-        # Cột nhãn thời gian dọc
-        with row_cols[0]:
-            st.markdown(f"<div class='month-label'>{month}</div>", unsafe_allow_html=True)
+        # Nếu là tháng trong quá khứ -> tự động thu gọn (collapse)
+        if month != "Không rõ":
+            try:
+                m_dt = datetime.strptime(month, "%m/%Y")
+                if m_dt.date() < current_month_dt:
+                    is_expanded = False
+            except: pass
             
-        # Các cột trạng thái
-        with row_cols[1]:
-            status_cols = st.columns(3)
-            statuses = ["Not Yet", "In Progress", "Completed"]
+        # Dùng st.expander cho từng tháng
+        with st.expander(f"Tháng {month}", expanded=is_expanded):
+            m_cols = st.columns(6)
             
-            for i, stt in enumerate(statuses):
-                with status_cols[i]:
-                    loc_cols = st.columns(2)
-                    for j, loc in enumerate(["TP.HCM", "KHÁC"]):
-                        # Rút trích data cụ thể cho từng sub-box
-                        subset = df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == stt) & (df_final['Loc'] == loc)]
-                        count = len(subset)
-                        
-                        # Làm mờ tiêu đề (opacity) nếu không có data
-                        opacity = 1.0 if count > 0 else 0.3
-                        
-                        with loc_cols[j]:
-                            # Hiện bộ đếm (Counter)
-                            st.markdown(f"<div class='loc-header' style='opacity: {opacity}'>{loc} ({count})</div>", unsafe_allow_html=True)
+            # Map index cột tương ứng với Trạng thái và Vị trí
+            col_mapping = {
+                ("Not Yet", "TP.HCM"): 0, ("Not Yet", "KHÁC"): 1,
+                ("In Progress", "TP.HCM"): 2, ("In Progress", "KHÁC"): 3,
+                ("Completed", "TP.HCM"): 4, ("Completed", "KHÁC"): 5
+            }
+            
+            for stt in ["Not Yet", "In Progress", "Completed"]:
+                for loc in ["TP.HCM", "KHÁC"]:
+                    c_idx = col_mapping[(stt, loc)]
+                    subset = df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == stt) & (df_final['Loc'] == loc)]
+                    
+                    with m_cols[c_idx]:
+                        for _, row in subset.iterrows():
+                            # Gắn Emoji
+                            if row['Loại bánh'].lower() == "gato": icon = "🎂"
+                            elif row['Loại bánh'].lower() == "cookies": icon = "🍪"
+                            else: icon = "🍰"
                             
-                            # Rải các nút tên có kèm icon
-                            for _, row in subset.iterrows():
-                                # Gắn Emoji
-                                if row['Loại bánh'].lower() == "gato": icon = "🎂"
-                                elif row['Loại bánh'].lower() == "cookies": icon = "🍪"
-                                else: icon = "🍰"
-                                
-                                # Tạo Button
-                                if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{stt}_{loc}", type="secondary", use_container_width=True):
-                                    show_detail_dialog(row['Name'])
-        
-        # Kẻ vạch ngăn cách các tháng
-        st.markdown("<div class='dotted-line'></div>", unsafe_allow_html=True)
+                            # Render Button
+                            if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{stt}_{loc}", type="secondary", use_container_width=True):
+                                show_detail_dialog(row['Name'])
 else:
     st.info("Chưa có người nhận nào trên hệ thống.")
 
