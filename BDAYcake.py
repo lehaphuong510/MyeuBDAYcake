@@ -78,6 +78,26 @@ st.markdown("""
         font-weight: bold;
         border: none;
     }
+
+    /* TÍNH NĂNG MỚI: Style cho các nút giả text ở Overall Process */
+    .stealth-btn button {
+        background: transparent !important;
+        color: #4A148C !important;
+        border: none !important;
+        box-shadow: none !important;
+        text-transform: none !important;
+        font-weight: bold !important;
+        text-align: left !important;
+        padding: 5px 0 !important;
+        font-size: 1.05rem !important;
+        transition: all 0.2s ease;
+    }
+    .stealth-btn button:hover {
+        color: #D81B60 !important;
+        background: transparent !important;
+        transform: translateX(5px);
+    }
+
     .process-box {
         background: linear-gradient(to right, #D81B60, #8E24AA);
         color: white;
@@ -305,6 +325,36 @@ df_tasks = load_and_sync_tasks()
 df_tasks['Ngày thực hiện'] = pd.to_datetime(df_tasks['Ngày thực hiện'], format="%d/%m/%Y", errors='coerce')
 today = datetime.today().date()
 
+# ==========================================
+# HÀM BẬT POP-UP CHI TIẾT (@st.dialog)
+# ==========================================
+@st.dialog("🔍 THÔNG TIN CHI TIẾT")
+def show_detail_dialog(person_name):
+    if person_name == "Khác" or df_tasks.empty:
+        st.info("Không có thông tin chi tiết cho mục này.")
+        return
+        
+    p_data = df_tasks[df_tasks['Tên người nhận'] == person_name].iloc[0]
+    bday = st.session_state.birthday_map.get(person_name, "Không rõ")
+    
+    sdt = str(p_data['SĐT']).strip()
+    if sdt.endswith('.0'): sdt = sdt[:-2]
+    if sdt and not sdt.startswith('0') and sdt.isdigit(): sdt = '0' + sdt
+    if not sdt: sdt = "Không có"
+        
+    st.markdown(f"""
+    <div style='font-size: 1.1em; line-height: 1.8; color: #333;'>
+        <b>👤 Tên người nhận:</b> <span style='color:#D81B60; font-size: 1.15em;'>{person_name}</span><br>
+        <b>💌 Tên trên thiệp:</b> {p_data['Tên trên thiệp']}<br>
+        <b>🏙️ Thành phố:</b> {p_data['TP']}<br>
+        <b>🎂 Loại bánh:</b> {p_data['Loại bánh']}<br>
+        <b>🎈 Ngày sinh nhật:</b> {bday}<br>
+        <b>📞 SĐT:</b> {sdt}<br>
+        <b>🏠 Địa chỉ:</b> {p_data['Địa chỉ']}<br>
+        <b>📝 Lưu ý chung:</b> {p_data['Lưu ý']}
+    </div>
+    """, unsafe_allow_html=True)
+
 # Overdue logic
 overdue_tasks = df_tasks[(df_tasks['Ngày thực hiện'].dt.date < today) & (df_tasks['Trạng thái'] != "Hoàn thành")]
 if not overdue_tasks.empty:
@@ -355,54 +405,23 @@ with tab_cal:
     # CSS Tùy chỉnh lịch
     custom_calendar_css = """
     /* Reset chung */
-    .fc .fc-button-primary {
-        background-image: none !important;
-        border: none !important;
-        box-shadow: none !important;
-        text-transform: uppercase !important;
-        font-weight: bold !important;
-    }
-
-    /* Nút Today: Không nền, không viền, chữ hồng đậm */
-    .fc .fc-today-button {
-        background-color: transparent !important;
-        color: #D81B60 !important;
-        border: none !important;
-    }
-    .fc .fc-today-button:disabled {
-        opacity: 0.5 !important;
-    }
-
-    /* Nút mũi tên TRÁI và PHẢI: Không nền, viền xám, icon xám */
-    .fc .fc-prev-button,
-    .fc .fc-next-button {
-        background-color: transparent !important;
-        border: 1px solid #9E9E9E !important;
-        color: #555555 !important;
-    }
-    
-    /* Hiệu ứng hover nhẹ cho 2 nút mũi tên */
-    .fc .fc-prev-button:hover,
-    .fc .fc-next-button:hover {
-        background-color: #f5f5f5 !important;
-        color: #333333 !important;
-    }
-
-    /* Nút Month / Week: Mặc định là màu Đen */
-    .fc .fc-dayGridMonth-button, 
-    .fc .fc-timeGridWeek-button {
-        background-color: #000000 !important;
-        color: white !important;
-    }
-
-    /* Nút Month / Week khi đang được chọn (Active): Hồng đậm */
-    .fc .fc-dayGridMonth-button.fc-button-active, 
-    .fc .fc-timeGridWeek-button.fc-button-active {
-        background-color: #D81B60 !important;
-    }
+    .fc .fc-button-primary { background-image: none !important; border: none !important; box-shadow: none !important; text-transform: uppercase !important; font-weight: bold !important; }
+    .fc .fc-today-button { background-color: transparent !important; color: #D81B60 !important; border: none !important; }
+    .fc .fc-today-button:disabled { opacity: 0.5 !important; }
+    .fc .fc-prev-button, .fc .fc-next-button { background-color: transparent !important; border: 1px solid #9E9E9E !important; color: #555555 !important; }
+    .fc .fc-prev-button:hover, .fc .fc-next-button:hover { background-color: #f5f5f5 !important; color: #333333 !important; }
+    .fc .fc-dayGridMonth-button, .fc .fc-timeGridWeek-button { background-color: #000000 !important; color: white !important; }
+    .fc .fc-dayGridMonth-button.fc-button-active, .fc .fc-timeGridWeek-button.fc-button-active { background-color: #D81B60 !important; }
     """
     
-    calendar(events=calendar_events, options=calendar_options, custom_css=custom_calendar_css)
+    # BẮT SỰ KIỆN CLICK TRÊN LỊCH ĐỂ GỌI POP-UP
+    cal_widget = calendar(events=calendar_events, options=calendar_options, custom_css=custom_calendar_css, key="main_calendar")
+    
+    if cal_widget.get("callback") == "eventClick":
+        clicked_title = cal_widget["eventClick"]["event"]["title"]
+        person_name = clicked_title.split(" | ")[0].strip()
+        if person_name != "Khác":
+            show_detail_dialog(person_name)
 
 with tab_todo:
     sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3, sub_tab_4, sub_tab_5 = st.tabs([
@@ -457,18 +476,12 @@ with tab_todo:
                 st.session_state.tasks_data[idx]['Trạng thái'] = new_val
                 st.rerun()
 
-    with sub_tab_0:
-        render_task_list(overdue_tasks, "overdue")
-    with sub_tab_1:
-        render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today], "today")
-    with sub_tab_2:
-        render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today + timedelta(days=1)], "tomorrow")
-    with sub_tab_3:
-        render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=4))], "4days")
-    with sub_tab_4:
-        render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=8))], "8days")
-    with sub_tab_5:
-        render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=30))], "30days")
+    with sub_tab_0: render_task_list(overdue_tasks, "overdue")
+    with sub_tab_1: render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today], "today")
+    with sub_tab_2: render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today + timedelta(days=1)], "tomorrow")
+    with sub_tab_3: render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=4))], "4days")
+    with sub_tab_4: render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=8))], "8days")
+    with sub_tab_5: render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=30))], "30days")
 
 st.write("---")
 
@@ -539,15 +552,27 @@ for name, group in grouped:
     else:
         in_progress.append(name)
 
+# UPDATE: Thay vì in text thì dùng button tàng hình gọi Pop-up
 with process_cols[0]:
     st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
-    for n in not_yet: st.write(f"- {n}")
+    st.markdown("<div class='stealth-btn'>", unsafe_allow_html=True)
+    for n in not_yet:
+        if st.button(f"▪ {n}", key=f"btn_{n}_notyet"): show_detail_dialog(n)
+    st.markdown("</div>", unsafe_allow_html=True)
+        
 with process_cols[1]:
     st.markdown("<div class='process-box'>🚀 IN PROGRESS</div>", unsafe_allow_html=True)
-    for n in in_progress: st.write(f"- {n}")
+    st.markdown("<div class='stealth-btn'>", unsafe_allow_html=True)
+    for n in in_progress:
+        if st.button(f"▪ {n}", key=f"btn_{n}_inprogress"): show_detail_dialog(n)
+    st.markdown("</div>", unsafe_allow_html=True)
+        
 with process_cols[2]:
     st.markdown("<div class='process-box'>✅ COMPLETED</div>", unsafe_allow_html=True)
-    for n in completed: st.write(f"- {n}")
+    st.markdown("<div class='stealth-btn'>", unsafe_allow_html=True)
+    for n in completed:
+        if st.button(f"▪ {n}", key=f"btn_{n}_completed"): show_detail_dialog(n)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 st.write("---")
 
