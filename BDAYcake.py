@@ -7,7 +7,7 @@ from streamlit_calendar import calendar
 import time
 
 # --- CẤU HÌNH GIAO DIỆN & UX/UI ---
-st.set_page_config(page_title="Timeline Management", layout="wide")
+st.set_page_config(page_title="Timeline Management", page_icon="🎂", layout="wide")
 
 st.markdown("""
 <style>
@@ -16,7 +16,8 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-transform: uppercase;
-        white-space: nowrap;
+        /* Trả lại nowrap để không bao giờ bị rớt dòng ngẫu nhiên */
+        white-space: nowrap; 
         text-align: left;
         font-weight: bold;
     }
@@ -26,7 +27,7 @@ st.markdown("""
         font-size: 1.1rem;
     }
     
-    /* CSS cho Task Box - Fix lại để có thể click xổ ra */
+    /* CSS cho Task Box - Click xổ ra */
     .task-box {
         border-left: 5px solid #D81B60;
         background-color: #fcfcfc;
@@ -49,7 +50,7 @@ st.markdown("""
     details > summary::-webkit-details-marker {
         display: none;
     }
-    /* Tạo mũi tên tuỳ chỉnh đẹp hơn */
+    /* Tạo mũi tên tuỳ chỉnh */
     .task-title::before {
         content: "▶";
         display: inline-block;
@@ -117,7 +118,7 @@ st.markdown("""
         text-decoration: none !important;
     }
 
-    /* CSS cho Note: Độ trong suốt 50% (Glassmorphism) */
+    /* CSS cho Note: Độ trong suốt 50% */
     .note-box {
         background: linear-gradient(to right, rgba(248, 187, 208, 0.5), rgba(225, 190, 231, 0.5));
         backdrop-filter: blur(10px);
@@ -128,6 +129,41 @@ st.markdown("""
         color: #4A148C; 
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         border-left: 5px solid rgba(171, 71, 188, 0.8);
+    }
+
+    /* ========================================= */
+    /* RESPONSIVE TRÊN MOBILE: "ÉP CÂN" FONT CHỮ */
+    /* ========================================= */
+    @media (max-width: 768px) {
+        h1 {
+            font-size: 6.5vw !important; /* Chữ to nhất tự scale theo màn hình */
+        }
+        h2 {
+            font-size: 5.5vw !important; /* Tiêu đề thẻ tự scale */
+        }
+        h3, h4 {
+            font-size: 4.5vw !important;
+        }
+        
+        /* Cân đối lại lịch trên mobile */
+        .fc .fc-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center !important;
+            gap: 10px;
+        }
+        .fc .fc-toolbar-chunk {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .fc .fc-toolbar-title {
+            font-size: 1.5rem !important;
+        }
+        .fc .fc-button {
+            font-size: 0.85rem !important;
+            padding: 0.3em 0.6em !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -288,13 +324,17 @@ with tab_cal:
         
         is_done = r['Trạng thái'] == "Hoàn thành"
         is_overdue = r['Ngày thực hiện'].date() < today and not is_done
+        task_name = str(r['Tên Task']).strip().lower()
         
+        # ĐỔI MÀU GIAO BÁNH = TÍM
         if is_done:
             bg_color = "#9E9E9E" 
         elif is_overdue:
             bg_color = "#c62828" 
+        elif task_name == "giao bánh":
+            bg_color = "#8E24AA"  
         else:
-            bg_color = "#D81B60" 
+            bg_color = "#D81B60"  
         
         calendar_events.append({
             "title": f"{prefix} | {r['Tên Task']}",
@@ -394,7 +434,6 @@ with tab_todo:
             if sdt_hien_thi and not sdt_hien_thi.startswith('0') and sdt_hien_thi.isdigit():
                 sdt_hien_thi = '0' + sdt_hien_thi
             
-            # ĐÃ UPDATE LẠI ĐOẠN NÀY ĐỂ TẠO HIỆU ỨNG SỔ RA
             st.markdown(f"""
             <div class='task-box'>
                 <details>
