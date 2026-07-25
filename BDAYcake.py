@@ -730,10 +730,10 @@ if not df_sum.empty:
 
         fig = go.Figure()
 
-        # Cột Stacked (Màu gradient tuỳ chỉnh theo ý user)
+        # Cột Stacked
         fig.add_trace(go.Bar(
             x=chart_months, y=ny_counts, name='Not Yet',
-            marker_color='#f7daec', 
+            marker_color='#E0E0E0',  # Xám nhạt
             text=text_ny, textposition='auto'
         ))
         fig.add_trace(go.Bar(
@@ -751,8 +751,8 @@ if not df_sum.empty:
         fig.add_trace(go.Scatter(
             x=chart_months, y=total_counts, name='Total Orders',
             mode='lines+markers+text',
-            marker=dict(color='#e374bc', size=10),
-            line=dict(color='#e374bc', width=1.5, dash='dash'), 
+            marker=dict(color='#e374bc', size=5), # Thu nhỏ chấm tròn
+            line=dict(color='#e374bc', width=1, dash='dot'), # Thanh mảnh, dạng chấm bi nhẹ
             text=text_total,
             textposition='top center',
             textfont=dict(color='#e374bc', size=14)
