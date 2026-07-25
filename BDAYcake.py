@@ -65,7 +65,6 @@ st.markdown("""
     /* TÁCH BIỆT NÚT CHÍNH VÀ NÚT PHỤ (VIỀN)     */
     /* ========================================= */
     
-    /* 1. NÚT CHÍNH (PRIMARY): Bôi màu Gradient (Làm mới, Create Task, Create Note...) */
     div.stButton > button[kind="primary"], div.stFormSubmitButton > button {
         background: linear-gradient(to right, #D81B60, #8E24AA) !important;
         color: white !important;
@@ -78,19 +77,18 @@ st.markdown("""
         opacity: 0.85 !important;
     }
 
-    /* 2. NÚT PHỤ (SECONDARY): Chỉ có Viền (Các tên người trong Overall Process) */
     div.stButton > button[kind="secondary"] {
         background: transparent !important;
         color: #8E24AA !important;
-        border: 1.5px solid #D81B60 !important; /* Viền mỏng màu hồng */
+        border: 1.5px solid #D81B60 !important;
         font-weight: bold !important;
         border-radius: 8px !important;
         transition: all 0.3s ease !important;
     }
     div.stButton > button[kind="secondary"]:hover {
-        background: rgba(216, 27, 96, 0.05) !important; /* Nền highlight siêu mờ */
+        background: rgba(216, 27, 96, 0.05) !important;
         color: #D81B60 !important;
-        border-color: #8E24AA !important; /* Đổi màu viền khi hover */
+        border-color: #8E24AA !important;
         transform: translateY(-2px);
     }
 
@@ -143,6 +141,40 @@ st.markdown("""
         color: #4A148C; 
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         border-left: 5px solid rgba(171, 71, 188, 0.8);
+    }
+
+    /* CSS RIÊNG CHO LAYOUT OVERALL PROCESS MỚI */
+    .month-label {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        background-color: #757575; /* Màu xám như mockup */
+        color: white;
+        text-align: center;
+        padding: 20px 5px;
+        border-radius: 8px;
+        font-weight: bold;
+        height: 100%;
+        min-height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1em;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+    }
+    .loc-header {
+        background-color: #757575;
+        color: white;
+        text-align: center;
+        border-radius: 5px;
+        font-weight: bold;
+        padding: 5px;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+    }
+    .dotted-line {
+        border-bottom: 2px dotted #9E9E9E;
+        margin: 20px 0;
     }
 
     @media (max-width: 768px) {
@@ -497,37 +529,114 @@ with st.form("add_task_form", clear_on_submit=True):
 st.write("---")
 
 # ==========================================
-# 3. OVERALL PROCESS
+# 3. OVERALL PROCESS (UPDATE MỚI NHẤT)
 # ==========================================
 st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
 
-process_cols = st.columns(3)
-grouped = df_tasks.groupby('Tên người nhận')
+# Chuẩn bị Data tổng quan cho từng người
+person_summary = []
+orig_df = pd.DataFrame(st.session_state.source_data) if 'source_data' in st.session_state else pd.DataFrame()
 
-not_yet, in_progress, completed = [], [], []
-
-for name, group in grouped:
+for name, group in df_tasks.groupby('Tên người nhận'):
+    if name == "Khác": continue
     total = len(group)
     done = len(group[group['Trạng thái'] == "Hoàn thành"])
-    if done == 0: not_yet.append(name)
-    elif done == total: completed.append(name)
-    else: in_progress.append(name)
+    
+    status = "Completed" if done == total else ("Not Yet" if done == 0 else "In Progress")
+    
+    tp_val = group['TP'].iloc[0] if 'TP' in group.columns else ""
+    loc = "TP.HCM" if tp_val == "TPHCM" else "KHÁC"
+    loai_banh = str(group['Loại bánh'].iloc[0]).strip() if 'Loại bánh' in group.columns else ""
+    
+    # Móc ngày giao bánh gốc để chia tháng
+    month_dt = None
+    if not orig_df.empty:
+        p_orig = orig_df[orig_df['Tên'] == name]
+        if not p_orig.empty:
+            ngay_giao = str(p_orig.iloc[0].get('Ngày giao bánh', '')).strip()
+            try:
+                month_dt = datetime.strptime(ngay_giao, "%d/%m/%Y")
+            except:
+                pass
+                
+    person_summary.append({
+        "Name": name,
+        "Status": status,
+        "Loc": loc,
+        "Loại bánh": loai_banh,
+        "Month_DT": month_dt
+    })
 
-# Các nút tên người dùng type="secondary" để nhận CSS hiển thị viền
-with process_cols[0]:
-    st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
-    for n in not_yet:
-        if st.button(n, key=f"btn_{n}_notyet", type="secondary", use_container_width=True): show_detail_dialog(n)
+df_sum = pd.DataFrame(person_summary)
+
+if not df_sum.empty:
+    # Xử lý format tháng và sort
+    df_valid = df_sum[df_sum['Month_DT'].notnull()].copy()
+    df_invalid = df_sum[df_sum['Month_DT'].isnull()].copy()
+    
+    sorted_months = []
+    if not df_valid.empty:
+        df_valid['Month_Str'] = df_valid['Month_DT'].dt.strftime("%m/%Y")
+        df_valid = df_valid.sort_values('Month_DT')
+        sorted_months = df_valid['Month_Str'].unique().tolist()
         
-with process_cols[1]:
-    st.markdown("<div class='process-box'>🚀 IN PROGRESS</div>", unsafe_allow_html=True)
-    for n in in_progress:
-        if st.button(n, key=f"btn_{n}_inprogress", type="secondary", use_container_width=True): show_detail_dialog(n)
+    if not df_invalid.empty:
+        df_invalid['Month_Str'] = "Không rõ"
+        sorted_months.append("Không rõ")
         
-with process_cols[2]:
-    st.markdown("<div class='process-box'>✅ COMPLETED</div>", unsafe_allow_html=True)
-    for n in completed:
-        if st.button(n, key=f"btn_{n}_completed", type="secondary", use_container_width=True): show_detail_dialog(n)
+    df_final = pd.concat([df_valid, df_invalid])
+    
+    # 3.1 Dàn Tiêu Đề Bảng Trạng Thái
+    top_cols = st.columns([1, 11])
+    with top_cols[1]:
+        header_cols = st.columns(3)
+        with header_cols[0]: st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
+        with header_cols[1]: st.markdown("<div class='process-box'>🚀 IN PROGRESS</div>", unsafe_allow_html=True)
+        with header_cols[2]: st.markdown("<div class='process-box'>✅ COMPLETED</div>", unsafe_allow_html=True)
+        
+    # 3.2 Render Box Từng Tháng
+    for month in sorted_months:
+        row_cols = st.columns([1, 11])
+        
+        # Cột nhãn thời gian dọc
+        with row_cols[0]:
+            st.markdown(f"<div class='month-label'>{month}</div>", unsafe_allow_html=True)
+            
+        # Các cột trạng thái
+        with row_cols[1]:
+            status_cols = st.columns(3)
+            statuses = ["Not Yet", "In Progress", "Completed"]
+            
+            for i, stt in enumerate(statuses):
+                with status_cols[i]:
+                    loc_cols = st.columns(2)
+                    for j, loc in enumerate(["TP.HCM", "KHÁC"]):
+                        # Rút trích data cụ thể cho từng sub-box
+                        subset = df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == stt) & (df_final['Loc'] == loc)]
+                        count = len(subset)
+                        
+                        # Làm mờ tiêu đề (opacity) nếu không có data
+                        opacity = 1.0 if count > 0 else 0.3
+                        
+                        with loc_cols[j]:
+                            # Hiện bộ đếm (Counter)
+                            st.markdown(f"<div class='loc-header' style='opacity: {opacity}'>{loc} ({count})</div>", unsafe_allow_html=True)
+                            
+                            # Rải các nút tên có kèm icon
+                            for _, row in subset.iterrows():
+                                # Gắn Emoji
+                                if row['Loại bánh'].lower() == "gato": icon = "🎂"
+                                elif row['Loại bánh'].lower() == "cookies": icon = "🍪"
+                                else: icon = "🍰"
+                                
+                                # Tạo Button
+                                if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{stt}_{loc}", type="secondary", use_container_width=True):
+                                    show_detail_dialog(row['Name'])
+        
+        # Kẻ vạch ngăn cách các tháng
+        st.markdown("<div class='dotted-line'></div>", unsafe_allow_html=True)
+else:
+    st.info("Chưa có người nhận nào trên hệ thống.")
 
 st.write("---")
 
