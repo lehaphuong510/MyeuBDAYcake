@@ -305,7 +305,9 @@ def load_and_sync_tasks():
 df_tasks = load_and_sync_tasks()
 if not df_tasks.empty:
     df_tasks['Ngày thực hiện'] = pd.to_datetime(df_tasks['Ngày thực hiện'], format="%d/%m/%Y", errors='coerce')
-today = datetime.today().date()
+
+# ĐÃ FIX THÀNH GIỜ VIỆT NAM (GMT+7) ĐỂ HIỂN THỊ ĐÚNG TẤT CẢ CÁC TAB
+today = (datetime.utcnow() + timedelta(hours=7)).date()
 
 # KHAI BÁO CÁC TASK CHUẨN ĐỂ GOM NHÓM LỌC
 STANDARD_TASKS = [
@@ -486,7 +488,6 @@ with tab_cal:
             show_detail_dialog(person_name)
 
 with tab_todo:
-    # THÊM TAB SỐ 7: TẤT CẢ (WHOLE PROJECT)
     sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3, sub_tab_4, sub_tab_5, sub_tab_6 = st.tabs([
         "⚠️ QUÁ HẠN", "🕒 HÔM NAY", "🌅 NGÀY MAI", "⏳ TRONG VÒNG 4 NGÀY", "📆 TRONG VÒNG 8 NGÀY", "📅 TRONG VÒNG 1 THÁNG", "♾️ TẤT CẢ (WHOLE PROJECT)"
     ])
@@ -572,7 +573,8 @@ with st.form("add_task_form", clear_on_submit=True):
             if sdt.endswith('.0'): sdt = sdt[:-2]
             if sdt and not sdt.startswith('0') and sdt.isdigit(): sdt = '0' + sdt
             
-        new_id = f"Manual_{belong_to}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        # ĐÃ FIX THÀNH GIỜ VIỆT NAM (GMT+7) ĐỂ TẠO ID MỚI KHÔNG TRÙNG LẶP
+        new_id = f"Manual_{belong_to}_{(datetime.utcnow() + timedelta(hours=7)).strftime('%Y%m%d%H%M%S')}"
         
         ws_tasks.append_row([
             new_id, task_date.strftime("%d/%m/%Y"), belong_to, tp, loai, task_name,
@@ -805,7 +807,8 @@ with note_col1:
         note_msg = st.empty()
         
         if note_submitted and note_text:
-            time_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+            # ĐÃ FIX THÀNH GIỜ VIỆT NAM (GMT+7) ĐỂ GHI NHẬN NOTE ĐÚNG THỜI GIAN
+            time_str = (datetime.utcnow() + timedelta(hours=7)).strftime("%d/%m/%Y %H:%M")
             ws_notes.append_row([time_str, note_text])
             st.session_state.notes_data.append({"Thời gian": time_str, "Nội dung Note": note_text})
             note_msg.success("Đã tạo Note thành công!")
