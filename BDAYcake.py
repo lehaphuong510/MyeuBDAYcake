@@ -303,6 +303,21 @@ def load_and_sync_tasks():
                 (ngay_giao, "Giao bánh")
             ]
             
+        # LOGIC CHECK NGÀY SINH & TẠO TASK "Gửi Drive CMSN"
+        bday_str = str(row.get('Ngày sinh nhật', '')).strip()
+        if bday_str:
+            parts = bday_str.split('/')
+            if len(parts) >= 2:
+                try:
+                    b_day = int(parts[0])
+                    b_month = int(parts[1])
+                    # Xử lý năm: T7->T12 là 2026, T1->T6 là 2027
+                    b_year = 2026 if 7 <= b_month <= 12 else 2027
+                    bday_date = datetime(b_year, b_month, b_day).date()
+                    tasks_to_create.append((bday_date, "Gửi Drive CMSN"))
+                except ValueError:
+                    pass
+            
         for t_date, t_name in tasks_to_create:
             task_id = f"{ten}_{t_date.strftime('%Y%m%d')}_{t_name}"
             if task_id not in existing_task_ids:
@@ -395,17 +410,31 @@ with tab_cal:
         is_overdue = r['Ngày thực hiện'].date() < today and not is_done
         task_name = str(r['Tên Task']).strip().lower()
         
-        if is_done: bg_color = "#9E9E9E" 
-        elif is_overdue: bg_color = "#c62828" 
-        elif task_name == "giao bánh": bg_color = "#8E24AA"  
-        else: bg_color = "#D81B60"  
+        event_class = ""
         
-        calendar_events.append({
+        if is_done: 
+            bg_color = "#9E9E9E" 
+        elif is_overdue: 
+            bg_color = "#c62828" 
+        elif task_name == "giao bánh": 
+            bg_color = "#8E24AA"  
+        elif task_name == "gửi drive cmsn":
+            bg_color = "transparent" # Bị override bởi css class
+            event_class = "bday-task-gradient"
+        else: 
+            bg_color = "#D81B60"  
+            
+        event_obj = {
             "title": f"{prefix} | {r['Tên Task']}",
             "start": r['Ngày thực hiện'].strftime("%Y-%m-%d"),
             "backgroundColor": bg_color,
             "borderColor": "transparent"
-        })
+        }
+        
+        if event_class:
+            event_obj["className"] = event_class
+            
+        calendar_events.append(event_obj)
 
     calendar_options = {
         "headerToolbar": {
@@ -424,6 +453,17 @@ with tab_cal:
     .fc .fc-prev-button:hover, .fc .fc-next-button:hover { background-color: #f5f5f5 !important; color: #333333 !important; }
     .fc .fc-dayGridMonth-button, .fc .fc-timeGridWeek-button { background-color: #000000 !important; color: white !important; }
     .fc .fc-dayGridMonth-button.fc-button-active, .fc .fc-timeGridWeek-button.fc-button-active { background-color: #D81B60 !important; }
+    
+    /* STYLE RIÊNG CHO TASK CMSN (CAM SANG VÀNG) */
+    .bday-task-gradient {
+        background: linear-gradient(to right, #FF7043, #FFCA28) !important;
+        border: none !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+    }
+    .bday-task-gradient .fc-event-main, .bday-task-gradient .fc-event-title, .bday-task-gradient .fc-event-time {
+        color: #4A148C !important; /* Màu chữ tím sậm để nổi bật trên nền vàng/cam */
+        font-weight: bold !important;
+    }
     """
     
     cal_widget = calendar(events=calendar_events, options=calendar_options, custom_css=custom_calendar_css, key="main_calendar")
