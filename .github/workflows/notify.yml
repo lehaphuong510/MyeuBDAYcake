@@ -4,7 +4,7 @@ on:
   schedule:
     # Cấu hình giờ chạy. Giờ máy chủ là UTC. VN là GMT+7.
     # Nên 1:00 UTC nghĩa là 8:00 sáng giờ Việt Nam.
-    - cron: '25 21 * * *'
+    - cron: '26 17 * * *'
   workflow_dispatch: # Nút để m có thể bấm chạy thử bằng tay lúc nào cũng được
 
 jobs:
