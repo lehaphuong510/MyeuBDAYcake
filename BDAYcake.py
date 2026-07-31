@@ -307,6 +307,13 @@ if not df_tasks.empty:
     df_tasks['Ngày thực hiện'] = pd.to_datetime(df_tasks['Ngày thực hiện'], format="%d/%m/%Y", errors='coerce')
 today = datetime.today().date()
 
+# KHAI BÁO CÁC TASK CHUẨN ĐỂ GOM NHÓM LỌC
+STANDARD_TASKS = [
+    "Remind tiệm bánh", "Follow up", "Giao bánh", 
+    "Thông báo với tiệm bánh", "Đặt đơn ship", "Remind shipper", 
+    "Gửi Drive CMSN"
+]
+
 # --- SIDEBAR & BỘ LỌC TÌM KIẾM ---
 with st.sidebar:
     st.markdown("### ⚙️ QUẢN TRỊ")
@@ -317,12 +324,14 @@ with st.sidebar:
     st.markdown("---")
     
     st.markdown("### 🔍 BỘ LỌC NHANH (TASK & LỊCH)")
-    # Lấy danh sách tên và task hiện có để đưa vào bộ lọc
-    all_names = sorted(list(set([n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]))) if not df_tasks.empty else []
-    all_task_types = sorted(list(set([t for t in df_tasks['Tên Task'].unique() if t]))) if not df_tasks.empty else []
     
+    all_names = sorted(list(set([n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]))) if not df_tasks.empty else []
     filter_names = st.multiselect("👤 Tìm theo Khách hàng:", all_names, placeholder="Tất cả...")
-    filter_tasks = st.multiselect("🏷️ Tìm theo Loại Task:", all_task_types, placeholder="Tất cả...")
+    
+    # Dropdown Task Type giờ chỉ hiện các Task chuẩn + Khác
+    filter_tasks_options = STANDARD_TASKS + ["Khác"]
+    filter_tasks = st.multiselect("🏷️ Tìm theo Loại Task:", filter_tasks_options, placeholder="Tất cả...")
+    
     filter_status = st.multiselect("🚦 Trạng thái:", ["Chưa hoàn thành", "Hoàn thành"], default=["Chưa hoàn thành", "Hoàn thành"])
 
     st.markdown("---")
@@ -339,8 +348,18 @@ df_filtered = df_tasks.copy()
 if not df_filtered.empty:
     if filter_names:
         df_filtered = df_filtered[df_filtered['Tên người nhận'].isin(filter_names)]
+        
     if filter_tasks:
-        df_filtered = df_filtered[df_filtered['Tên Task'].isin(filter_tasks)]
+        if "Khác" in filter_tasks:
+            selected_st_tasks = [t for t in filter_tasks if t != "Khác"]
+            # Lọc: lấy những task chuẩn được chọn HOẶC những task không nằm trong STANDARD_TASKS
+            df_filtered = df_filtered[
+                df_filtered['Tên Task'].isin(selected_st_tasks) | 
+                ~df_filtered['Tên Task'].isin(STANDARD_TASKS)
+            ]
+        else:
+            df_filtered = df_filtered[df_filtered['Tên Task'].isin(filter_tasks)]
+            
     if filter_status:
         df_filtered = df_filtered[df_filtered['Trạng thái'].isin(filter_status)]
 
@@ -393,7 +412,7 @@ if not overdue_tasks.empty:
         st.markdown(f"<div class='overdue-alert'>⚠️ {r['Tên người nhận']} - {r['Tên Task']} đã quá deadline</div>", unsafe_allow_html=True)
 
 # ==========================================
-# 1. TASK MANAGEMENT (Ảnh hưởng bởi Filter)
+# 1. TASK MANAGEMENT
 # ==========================================
 st.markdown("<h2 id='task-management'>TASK MANAGEMENT</h2>", unsafe_allow_html=True)
 tab_cal, tab_todo = st.tabs(["🗓️ LỊCH (CALENDAR)", "📋 TO-DO LIST (CHI TIẾT)"])
@@ -467,8 +486,9 @@ with tab_cal:
             show_detail_dialog(person_name)
 
 with tab_todo:
-    sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3, sub_tab_4, sub_tab_5 = st.tabs([
-        "⚠️ QUÁ HẠN", "🕒 HÔM NAY", "🌅 NGÀY MAI", "⏳ TRONG VÒNG 4 NGÀY", "📆 TRONG VÒNG 8 NGÀY", "📅 TRONG VÒNG 1 THÁNG"
+    # THÊM TAB SỐ 7: TẤT CẢ (WHOLE PROJECT)
+    sub_tab_0, sub_tab_1, sub_tab_2, sub_tab_3, sub_tab_4, sub_tab_5, sub_tab_6 = st.tabs([
+        "⚠️ QUÁ HẠN", "🕒 HÔM NAY", "🌅 NGÀY MAI", "⏳ TRONG VÒNG 4 NGÀY", "📆 TRONG VÒNG 8 NGÀY", "📅 TRONG VÒNG 1 THÁNG", "♾️ TẤT CẢ (WHOLE PROJECT)"
     ])
     
     def render_task_list(df_render, tab_key_suffix):
@@ -508,7 +528,6 @@ with tab_todo:
             
             if checked != is_done:
                 new_val = "Hoàn thành" if checked else "Chưa hoàn thành"
-                # Tìm index gốc trong list st.session_state.tasks_data
                 for real_idx, task_dict in enumerate(st.session_state.tasks_data):
                     if task_dict['Task_ID'] == r['Task_ID']:
                         ws_tasks.update_cell(real_idx + 2, 11, new_val)
@@ -522,6 +541,8 @@ with tab_todo:
     with sub_tab_3: render_task_list(df_filtered[(df_filtered['Ngày thực hiện'].dt.date >= today) & (df_filtered['Ngày thực hiện'].dt.date <= today + timedelta(days=4))], "4days")
     with sub_tab_4: render_task_list(df_filtered[(df_filtered['Ngày thực hiện'].dt.date >= today) & (df_filtered['Ngày thực hiện'].dt.date <= today + timedelta(days=8))], "8days")
     with sub_tab_5: render_task_list(df_filtered[(df_filtered['Ngày thực hiện'].dt.date >= today) & (df_filtered['Ngày thực hiện'].dt.date <= today + timedelta(days=30))], "30days")
+    # TẤT CẢ TASK TỪ HÔM NAY TRỞ VỀ SAU (KHÔNG GIỚI HẠN)
+    with sub_tab_6: render_task_list(df_filtered[df_filtered['Ngày thực hiện'].dt.date >= today], "all_time")
 
 st.write("---")
 
@@ -626,7 +647,6 @@ if not df_sum.empty:
         
     df_final = pd.concat([df_valid, df_invalid])
 
-    # VIEW 1: LAPTOP MODE
     if "Laptop mode" in view_mode:
         status_cols = st.columns(3)
         with status_cols[0]: st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
@@ -668,7 +688,6 @@ if not df_sum.empty:
                                 if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{stt}_{loc}_lap", type="secondary", use_container_width=True):
                                     show_detail_dialog(row['Name'])
 
-    # VIEW 2: MOBILE (Status Focused)
     elif "Status Focused" in view_mode:
         tab_ny, tab_ip, tab_cp = st.tabs(["⏳ NOT YET", "🚀 IN PROGRESS", "✅ COMPLETED"])
         def render_mobile_status_view(status_name):
@@ -694,7 +713,6 @@ if not df_sum.empty:
         with tab_ip: render_mobile_status_view("In Progress")
         with tab_cp: render_mobile_status_view("Completed")
 
-    # VIEW 3: MOBILE (Time Focused)
     elif "Time Focused" in view_mode:
         for month in sorted_months:
             total_month = len(df_final[df_final['Month_Str'] == month])
@@ -722,7 +740,6 @@ if not df_sum.empty:
                 with t_ip: render_month_status("In Progress")
                 with t_cp: render_month_status("Completed")
 
-    # CHART: BIỂU ĐỒ THỐNG KÊ TIẾN ĐỘ
     st.write("---")
     st.markdown("### 📊 BIỂU ĐỒ THỐNG KÊ TRẠNG THÁI THEO THÁNG")
     
