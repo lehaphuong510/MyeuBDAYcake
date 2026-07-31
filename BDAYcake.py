@@ -162,30 +162,6 @@ st.markdown("""
         margin-bottom: 10px;
         font-size: 0.9em;
     }
-    
-    /* CSS RIÊNG CHO LAYOUT OVERALL PROCESS LAPTOP */
-    .month-label {
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
-        background-color: #757575; 
-        color: white;
-        text-align: center;
-        padding: 20px 5px;
-        border-radius: 8px;
-        font-weight: bold;
-        height: 100%;
-        min-height: 120px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.1em;
-        letter-spacing: 2px;
-        margin-bottom: 10px;
-    }
-    .dotted-line {
-        border-bottom: 2px dotted #9E9E9E;
-        margin: 20px 0;
-    }
 
     @media (max-width: 768px) {
         h1 { font-size: 6.5vw !important; }
@@ -198,23 +174,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# --- NÚT REFRESH & AGENDA BÊN SIDEBAR ---
-with st.sidebar:
-    st.markdown("### ⚙️ QUẢN TRỊ")
-    if st.button("🔄 LÀM MỚI DỮ LIỆU", type="primary"):
-        st.session_state.clear()
-        st.rerun()
-    st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets và muốn cập nhật lại.")
-    
-    st.markdown("---")
-    st.markdown("### 📑 AGENDA CỦA TRANG")
-    st.markdown("""
-        <a href="#task-management" target="_self" class="agenda-link">📍 TASK MANAGEMENT</a>
-        <a href="#section-add-task" target="_self" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
-        <a href="#overall-process" target="_self" class="agenda-link">📍 OVERALL PROCESS</a>
-        <a href="#create-note" target="_self" class="agenda-link">📍 CREATE NOTE</a>
-    """, unsafe_allow_html=True)
 
 # --- KẾT NỐI GOOGLE SHEETS ---
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1SQrD2ps8L9mEXM8UTsqMalI090_mMT3WTLHY9lAhtBI/edit"
@@ -311,7 +270,6 @@ def load_and_sync_tasks():
                 try:
                     b_day = int(parts[0])
                     b_month = int(parts[1])
-                    # Xử lý năm: T7->T12 là 2026, T1->T6 là 2027
                     b_year = 2026 if 7 <= b_month <= 12 else 2027
                     bday_date = datetime(b_year, b_month, b_day).date()
                     tasks_to_create.append((bday_date, "Gửi Drive CMSN"))
@@ -343,13 +301,52 @@ def load_and_sync_tasks():
         
     return df_tasks
 
-# --- UI RENDERING ---
+# --- KHỞI TẠO DỮ LIỆU ---
+df_tasks = load_and_sync_tasks()
+if not df_tasks.empty:
+    df_tasks['Ngày thực hiện'] = pd.to_datetime(df_tasks['Ngày thực hiện'], format="%d/%m/%Y", errors='coerce')
+today = datetime.today().date()
+
+# --- SIDEBAR & BỘ LỌC TÌM KIẾM ---
+with st.sidebar:
+    st.markdown("### ⚙️ QUẢN TRỊ")
+    if st.button("🔄 LÀM MỚI DỮ LIỆU", type="primary"):
+        st.session_state.clear()
+        st.rerun()
+    st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets và muốn cập nhật lại.")
+    st.markdown("---")
+    
+    st.markdown("### 🔍 BỘ LỌC NHANH (TASK & LỊCH)")
+    # Lấy danh sách tên và task hiện có để đưa vào bộ lọc
+    all_names = sorted(list(set([n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]))) if not df_tasks.empty else []
+    all_task_types = sorted(list(set([t for t in df_tasks['Tên Task'].unique() if t]))) if not df_tasks.empty else []
+    
+    filter_names = st.multiselect("👤 Tìm theo Khách hàng:", all_names, placeholder="Tất cả...")
+    filter_tasks = st.multiselect("🏷️ Tìm theo Loại Task:", all_task_types, placeholder="Tất cả...")
+    filter_status = st.multiselect("🚦 Trạng thái:", ["Chưa hoàn thành", "Hoàn thành"], default=["Chưa hoàn thành", "Hoàn thành"])
+
+    st.markdown("---")
+    st.markdown("### 📑 AGENDA CỦA TRANG")
+    st.markdown("""
+        <a href="#task-management" target="_self" class="agenda-link">📍 TASK MANAGEMENT</a>
+        <a href="#section-add-task" target="_self" class="agenda-link">📍 ADD THÊM TASK MỚI</a>
+        <a href="#overall-process" target="_self" class="agenda-link">📍 OVERALL PROCESS</a>
+        <a href="#create-note" target="_self" class="agenda-link">📍 CREATE NOTE</a>
+    """, unsafe_allow_html=True)
+
+# --- ÁP DỤNG BỘ LỌC VÀO DATAFRAME ---
+df_filtered = df_tasks.copy()
+if not df_filtered.empty:
+    if filter_names:
+        df_filtered = df_filtered[df_filtered['Tên người nhận'].isin(filter_names)]
+    if filter_tasks:
+        df_filtered = df_filtered[df_filtered['Tên Task'].isin(filter_tasks)]
+    if filter_status:
+        df_filtered = df_filtered[df_filtered['Trạng thái'].isin(filter_status)]
+
+# --- UI RENDERING CHÍNH ---
 st.markdown("<h1>BDAY CAKE 19/07<br>TIMELINE MANAGEMENT</h1>", unsafe_allow_html=True)
 st.write("---")
-
-df_tasks = load_and_sync_tasks()
-df_tasks['Ngày thực hiện'] = pd.to_datetime(df_tasks['Ngày thực hiện'], format="%d/%m/%Y", errors='coerce')
-today = datetime.today().date()
 
 # ==========================================
 # HÀM BẬT POP-UP CHI TIẾT (@st.dialog)
@@ -389,27 +386,26 @@ def show_detail_dialog(person_name):
     </div>
     """, unsafe_allow_html=True)
 
-# Overdue logic
-overdue_tasks = df_tasks[(df_tasks['Ngày thực hiện'].dt.date < today) & (df_tasks['Trạng thái'] != "Hoàn thành")]
+# Lọc quá hạn DỰA TRÊN DF ĐÃ LỌC
+overdue_tasks = df_filtered[(df_filtered['Ngày thực hiện'].dt.date < today) & (df_filtered['Trạng thái'] != "Hoàn thành")]
 if not overdue_tasks.empty:
     for _, r in overdue_tasks.iterrows():
         st.markdown(f"<div class='overdue-alert'>⚠️ {r['Tên người nhận']} - {r['Tên Task']} đã quá deadline</div>", unsafe_allow_html=True)
 
 # ==========================================
-# 1. TASK MANAGEMENT
+# 1. TASK MANAGEMENT (Ảnh hưởng bởi Filter)
 # ==========================================
 st.markdown("<h2 id='task-management'>TASK MANAGEMENT</h2>", unsafe_allow_html=True)
 tab_cal, tab_todo = st.tabs(["🗓️ LỊCH (CALENDAR)", "📋 TO-DO LIST (CHI TIẾT)"])
 
 with tab_cal:
     calendar_events = []
-    for _, r in df_tasks.iterrows():
+    for _, r in df_filtered.iterrows():
         prefix = r['Tên người nhận'] if r['Tên người nhận'] != "Khác" else "Khác"
         
         is_done = r['Trạng thái'] == "Hoàn thành"
         is_overdue = r['Ngày thực hiện'].date() < today and not is_done
         task_name = str(r['Tên Task']).strip().lower()
-        
         event_class = ""
         
         if is_done: 
@@ -419,7 +415,7 @@ with tab_cal:
         elif task_name == "giao bánh": 
             bg_color = "#8E24AA"  
         elif task_name == "gửi drive cmsn":
-            bg_color = "transparent" # Bị override bởi css class
+            bg_color = "transparent" 
             event_class = "bday-task-gradient"
         else: 
             bg_color = "#D81B60"  
@@ -430,10 +426,7 @@ with tab_cal:
             "backgroundColor": bg_color,
             "borderColor": "transparent"
         }
-        
-        if event_class:
-            event_obj["className"] = event_class
-            
+        if event_class: event_obj["className"] = event_class
         calendar_events.append(event_obj)
 
     calendar_options = {
@@ -454,14 +447,13 @@ with tab_cal:
     .fc .fc-dayGridMonth-button, .fc .fc-timeGridWeek-button { background-color: #000000 !important; color: white !important; }
     .fc .fc-dayGridMonth-button.fc-button-active, .fc .fc-timeGridWeek-button.fc-button-active { background-color: #D81B60 !important; }
     
-    /* STYLE RIÊNG CHO TASK CMSN (CAM SANG VÀNG) */
     .bday-task-gradient {
         background: linear-gradient(to right, #FF7043, #FFCA28) !important;
         border: none !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
     }
     .bday-task-gradient .fc-event-main, .bday-task-gradient .fc-event-title, .bday-task-gradient .fc-event-time {
-        color: #4A148C !important; /* Màu chữ tím sậm để nổi bật trên nền vàng/cam */
+        color: #4A148C !important;
         font-weight: bold !important;
     }
     """
@@ -479,14 +471,14 @@ with tab_todo:
         "⚠️ QUÁ HẠN", "🕒 HÔM NAY", "🌅 NGÀY MAI", "⏳ TRONG VÒNG 4 NGÀY", "📆 TRONG VÒNG 8 NGÀY", "📅 TRONG VÒNG 1 THÁNG"
     ])
     
-    def render_task_list(df_filter, tab_key_suffix):
-        if df_filter.empty:
-            st.info("Không có task nào trong giai đoạn này!")
+    def render_task_list(df_render, tab_key_suffix):
+        if df_render.empty:
+            st.info("Không có task nào thỏa mãn điều kiện!")
             return
             
-        df_filter = df_filter.sort_values(by='Ngày thực hiện', ascending=True)
+        df_render = df_render.sort_values(by='Ngày thực hiện', ascending=True)
             
-        for idx, r in df_filter.iterrows():
+        for idx_filtered, r in df_render.iterrows():
             date_str = r['Ngày thực hiện'].strftime('%d/%m/%Y')
             prefix = r['Tên người nhận'] if r['Tên người nhận'] != "Khác" else "Khác"
             tp_loai = f"{r['TP']} - {r['Loại bánh']}" if r['TP'] else ""
@@ -516,17 +508,20 @@ with tab_todo:
             
             if checked != is_done:
                 new_val = "Hoàn thành" if checked else "Chưa hoàn thành"
-                row_in_sheet = idx + 2
-                ws_tasks.update_cell(row_in_sheet, 11, new_val)
-                st.session_state.tasks_data[idx]['Trạng thái'] = new_val
+                # Tìm index gốc trong list st.session_state.tasks_data
+                for real_idx, task_dict in enumerate(st.session_state.tasks_data):
+                    if task_dict['Task_ID'] == r['Task_ID']:
+                        ws_tasks.update_cell(real_idx + 2, 11, new_val)
+                        st.session_state.tasks_data[real_idx]['Trạng thái'] = new_val
+                        break
                 st.rerun()
 
     with sub_tab_0: render_task_list(overdue_tasks, "overdue")
-    with sub_tab_1: render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today], "today")
-    with sub_tab_2: render_task_list(df_tasks[df_tasks['Ngày thực hiện'].dt.date == today + timedelta(days=1)], "tomorrow")
-    with sub_tab_3: render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=4))], "4days")
-    with sub_tab_4: render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=8))], "8days")
-    with sub_tab_5: render_task_list(df_tasks[(df_tasks['Ngày thực hiện'].dt.date >= today) & (df_tasks['Ngày thực hiện'].dt.date <= today + timedelta(days=30))], "30days")
+    with sub_tab_1: render_task_list(df_filtered[df_filtered['Ngày thực hiện'].dt.date == today], "today")
+    with sub_tab_2: render_task_list(df_filtered[df_filtered['Ngày thực hiện'].dt.date == today + timedelta(days=1)], "tomorrow")
+    with sub_tab_3: render_task_list(df_filtered[(df_filtered['Ngày thực hiện'].dt.date >= today) & (df_filtered['Ngày thực hiện'].dt.date <= today + timedelta(days=4))], "4days")
+    with sub_tab_4: render_task_list(df_filtered[(df_filtered['Ngày thực hiện'].dt.date >= today) & (df_filtered['Ngày thực hiện'].dt.date <= today + timedelta(days=8))], "8days")
+    with sub_tab_5: render_task_list(df_filtered[(df_filtered['Ngày thực hiện'].dt.date >= today) & (df_filtered['Ngày thực hiện'].dt.date <= today + timedelta(days=30))], "30days")
 
 st.write("---")
 
@@ -576,16 +571,14 @@ with st.form("add_task_form", clear_on_submit=True):
 st.write("---")
 
 # ==========================================
-# 3. OVERALL PROCESS
+# 3. OVERALL PROCESS (Dùng Dữ Liệu Gốc)
 # ==========================================
 st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
+st.caption("Khu vực này hiển thị tổng quan tiến độ (không bị ảnh hưởng bởi bộ lọc bên Sidebar).")
 
-# Lựa chọn View Mode
 view_mode = st.selectbox(
     "👁️ CHỌN GÓC NHÌN TỔNG QUAN (VIEW MODE):", 
-    ["💻 Laptop mode", 
-     "📱 Mobile mode - Status Focused", 
-     "📱 Mobile mode - Time Focused"]
+    ["💻 Laptop mode", "📱 Mobile mode - Status Focused", "📱 Mobile mode - Time Focused"]
 )
 st.write("")
 
@@ -598,7 +591,6 @@ for name, group in df_tasks.groupby('Tên người nhận'):
     done = len(group[group['Trạng thái'] == "Hoàn thành"])
     
     status = "Completed" if done == total else ("Not Yet" if done == 0 else "In Progress")
-    
     tp_val = group['TP'].iloc[0] if 'TP' in group.columns else ""
     loc = "TP.HCM" if tp_val == "TPHCM" else "KHÁC"
     loai_banh = str(group['Loại bánh'].iloc[0]).strip() if 'Loại bánh' in group.columns else ""
@@ -608,8 +600,7 @@ for name, group in df_tasks.groupby('Tên người nhận'):
         p_orig = orig_df[orig_df['Tên'] == name]
         if not p_orig.empty:
             ngay_giao = str(p_orig.iloc[0].get('Ngày giao bánh', '')).strip()
-            try:
-                month_dt = datetime.strptime(ngay_giao, "%d/%m/%Y")
+            try: month_dt = datetime.strptime(ngay_giao, "%d/%m/%Y")
             except: pass
                 
     person_summary.append({
@@ -635,9 +626,7 @@ if not df_sum.empty:
         
     df_final = pd.concat([df_valid, df_invalid])
 
-    # ---------------------------------------------------------
     # VIEW 1: LAPTOP MODE
-    # ---------------------------------------------------------
     if "Laptop mode" in view_mode:
         status_cols = st.columns(3)
         with status_cols[0]: st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
@@ -673,19 +662,15 @@ if not df_sum.empty:
                     for loc in ["TP.HCM", "KHÁC"]:
                         c_idx = col_mapping[(stt, loc)]
                         subset = df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == stt) & (df_final['Loc'] == loc)]
-                        
                         with m_cols[c_idx]:
                             for _, row in subset.iterrows():
                                 icon = "🎂" if row['Loại bánh'].lower() == "gato" else ("🍪" if row['Loại bánh'].lower() == "cookies" else "🍰")
                                 if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{stt}_{loc}_lap", type="secondary", use_container_width=True):
                                     show_detail_dialog(row['Name'])
 
-    # ---------------------------------------------------------
     # VIEW 2: MOBILE (Status Focused)
-    # ---------------------------------------------------------
     elif "Status Focused" in view_mode:
         tab_ny, tab_ip, tab_cp = st.tabs(["⏳ NOT YET", "🚀 IN PROGRESS", "✅ COMPLETED"])
-        
         def render_mobile_status_view(status_name):
             for month in sorted_months:
                 total_month = len(df_final[df_final['Month_Str'] == month])
@@ -705,18 +690,14 @@ if not df_sum.empty:
                                     icon = "🎂" if row['Loại bánh'].lower() == "gato" else ("🍪" if row['Loại bánh'].lower() == "cookies" else "🍰")
                                     if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{status_name}_{loc}_m1", type="secondary", use_container_width=True):
                                         show_detail_dialog(row['Name'])
-
         with tab_ny: render_mobile_status_view("Not Yet")
         with tab_ip: render_mobile_status_view("In Progress")
         with tab_cp: render_mobile_status_view("Completed")
 
-    # ---------------------------------------------------------
     # VIEW 3: MOBILE (Time Focused)
-    # ---------------------------------------------------------
     elif "Time Focused" in view_mode:
         for month in sorted_months:
             total_month = len(df_final[df_final['Month_Str'] == month])
-            
             with st.expander(f"Tháng {month} ({total_month})", expanded=False):
                 count_ny = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == 'Not Yet')])
                 count_ip = len(df_final[(df_final['Month_Str'] == month) & (df_final['Status'] == 'In Progress')])
@@ -737,21 +718,17 @@ if not df_sum.empty:
                                 icon = "🎂" if row['Loại bánh'].lower() == "gato" else ("🍪" if row['Loại bánh'].lower() == "cookies" else "🍰")
                                 if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{status_name}_{loc}_m2", type="secondary", use_container_width=True):
                                     show_detail_dialog(row['Name'])
-
                 with t_ny: render_month_status("Not Yet")
                 with t_ip: render_month_status("In Progress")
                 with t_cp: render_month_status("Completed")
 
-    # ---------------------------------------------------------
-    # CHART: BIỂU ĐỒ THỐNG KÊ TIẾN ĐỘ (REAL-TIME)
-    # ---------------------------------------------------------
+    # CHART: BIỂU ĐỒ THỐNG KÊ TIẾN ĐỘ
     st.write("---")
     st.markdown("### 📊 BIỂU ĐỒ THỐNG KÊ TRẠNG THÁI THEO THÁNG")
     
     chart_months = [m for m in sorted_months if m != "Không rõ"]
     if chart_months:
         ny_counts, ip_counts, cp_counts, total_counts = [], [], [], []
-        
         for m in chart_months:
             ny = len(df_final[(df_final['Month_Str'] == m) & (df_final['Status'] == 'Not Yet')])
             ip = len(df_final[(df_final['Month_Str'] == m) & (df_final['Status'] == 'In Progress')])
@@ -762,50 +739,26 @@ if not df_sum.empty:
             cp_counts.append(cp)
             total_counts.append(ny + ip + cp)
             
-        # Ẩn số 0 trên label cho đẹp chart
         text_ny = [v if v > 0 else "" for v in ny_counts]
         text_ip = [v if v > 0 else "" for v in ip_counts]
         text_cp = [v if v > 0 else "" for v in cp_counts]
         text_total = [v if v > 0 else "" for v in total_counts]
 
         fig = go.Figure()
-
-        # Cột Stacked
-        fig.add_trace(go.Bar(
-            x=chart_months, y=ny_counts, name='Not Yet',
-            marker_color='#E0E0E0',  # Xám nhạt
-            text=text_ny, textposition='auto'
-        ))
-        fig.add_trace(go.Bar(
-            x=chart_months, y=ip_counts, name='In Progress',
-            marker_color='#ddc7e4', 
-            text=text_ip, textposition='auto'
-        ))
-        fig.add_trace(go.Bar(
-            x=chart_months, y=cp_counts, name='Completed',
-            marker_color='#9963a3', 
-            text=text_cp, textposition='auto'
-        ))
-
-        # Đường Line (Tổng đơn)
+        fig.add_trace(go.Bar(x=chart_months, y=ny_counts, name='Not Yet', marker_color='#E0E0E0', text=text_ny, textposition='auto'))
+        fig.add_trace(go.Bar(x=chart_months, y=ip_counts, name='In Progress', marker_color='#ddc7e4', text=text_ip, textposition='auto'))
+        fig.add_trace(go.Bar(x=chart_months, y=cp_counts, name='Completed', marker_color='#9963a3', text=text_cp, textposition='auto'))
         fig.add_trace(go.Scatter(
             x=chart_months, y=total_counts, name='Total Orders',
-            mode='lines+markers+text',
-            marker=dict(color='#e374bc', size=5), # Thu nhỏ chấm tròn
-            line=dict(color='#e374bc', width=1, dash='dot'), # Thanh mảnh, dạng chấm bi nhẹ
-            text=text_total,
-            textposition='top center',
-            textfont=dict(color='#e374bc', size=14)
+            mode='lines+markers+text', marker=dict(color='#e374bc', size=5),
+            line=dict(color='#e374bc', width=1, dash='dot'), text=text_total,
+            textposition='top center', textfont=dict(color='#e374bc', size=14)
         ))
 
         fig.update_layout(
-            barmode='stack',
-            xaxis_title="Tháng",
-            yaxis_title="Số lượng đơn hàng",
+            barmode='stack', xaxis_title="Tháng", yaxis_title="Số lượng đơn hàng",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            plot_bgcolor='rgba(0,0,0,0)', 
-            height=450,
-            margin=dict(l=20, r=20, t=50, b=20)
+            plot_bgcolor='rgba(0,0,0,0)', height=450, margin=dict(l=20, r=20, t=50, b=20)
         )
         fig.update_xaxes(showgrid=False)
         fig.update_yaxes(showgrid=True, gridcolor='rgba(200, 200, 200, 0.2)')
@@ -813,7 +766,6 @@ if not df_sum.empty:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Chưa có đủ dữ liệu theo tháng để vẽ biểu đồ.")
-
 else:
     st.info("Chưa có người nhận nào trên hệ thống.")
 
@@ -829,7 +781,6 @@ if "notes_data" not in st.session_state:
 
 note_col1, note_col2 = st.columns([1, 2])
 
-# Form tạo Note
 with note_col1:
     with st.form("add_note_form", clear_on_submit=True):
         note_text = st.text_area("Nhập nội dung Note:", height=150)
@@ -840,18 +791,15 @@ with note_col1:
             time_str = datetime.now().strftime("%d/%m/%Y %H:%M")
             ws_notes.append_row([time_str, note_text])
             st.session_state.notes_data.append({"Thời gian": time_str, "Nội dung Note": note_text})
-            
             note_msg.success("Đã tạo Note thành công!")
             time.sleep(1.2)
             st.rerun()
 
-# Hiển thị và Edit Note
 with note_col2:
     if not st.session_state.notes_data:
         st.info("Chưa có note nào. Hãy tạo note đầu tiên!")
     else:
         for idx, n in reversed(list(enumerate(st.session_state.notes_data))):
-            
             st.markdown(f"""
             <div class='note-box'>
                 <small style='color: #6a1b9a; font-weight: bold;'>🕒 {n.get('Thời gian', '')}</small><br>
@@ -859,9 +807,7 @@ with note_col2:
             </div>
             """, unsafe_allow_html=True)
             
-            if f"edit_mode_{idx}" not in st.session_state:
-                st.session_state[f"edit_mode_{idx}"] = False
-                
+            if f"edit_mode_{idx}" not in st.session_state: st.session_state[f"edit_mode_{idx}"] = False
             if st.button("✏️ Edit Note", key=f"btn_edit_{idx}", type="secondary"):
                 st.session_state[f"edit_mode_{idx}"] = not st.session_state[f"edit_mode_{idx}"]
                 st.rerun()
