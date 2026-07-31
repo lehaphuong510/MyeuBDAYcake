@@ -208,7 +208,7 @@ def edit_single_task_dialog(task_id):
             st.session_state.clear()
             st.rerun()
 
-@st.dialog("🔍 THÔNG TIN CHI TIẾT & SỬA ĐƠN HÀNG")
+@st.dialog("🔍 THÔNG TIN CHI TIẾT")
 def show_detail_dialog(person_name):
     if person_name == "Khác" or df_tasks.empty:
         st.info("Không có thông tin chi tiết cho mục này.")
@@ -231,9 +231,11 @@ def show_detail_dialog(person_name):
     <div style='font-size: 1.1em; line-height: 1.8; color: #333;'>
         <b>👤 Tên:</b> <span style='color:#D81B60; font-size: 1.15em;'>{person_name}</span><br>
         <b>💌 Tên trên thiệp:</b> {p_data['Tên trên thiệp']}<br>
-        <b>🏙️ Thành phố:</b> {p_data['TP']} | <b>🎂 Loại bánh:</b> {p_data['Loại bánh']}<br>
+        <b>🏙️ Thành phố:</b> {p_data['TP']}<br>
+        <b>🎂 Loại bánh:</b> {p_data['Loại bánh']}<br>
         <b>🚚 Ngày giao bánh:</b> <span style='color:#8E24AA; font-weight: bold;'>{ngay_giao}</span><br>
-        <b>🎈 Ngày sinh nhật:</b> {bday} | <b>📞 SĐT:</b> {sdt}<br>
+        <b>🎈 Ngày sinh nhật:</b> {bday}<br>
+        <b>📞 SĐT:</b> {sdt}<br>
         <b>🏠 Địa chỉ:</b> {p_data['Địa chỉ']}<br>
         <b>📝 Lưu ý chung:</b> {p_data['Lưu ý']}
     </div>
