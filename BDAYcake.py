@@ -21,59 +21,16 @@ st.markdown("""
         text-align: left;
         font-weight: bold;
     }
-    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        font-weight: bold;
-        color: #D81B60;
-        font-size: 1.1rem;
-    }
-    .task-box {
-        border-left: 5px solid #D81B60;
-        background-color: #fcfcfc;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-radius: 5px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .task-title {
-        color: #8E24AA;
-        font-weight: bold;
-        font-size: 1.15em;
-        cursor: pointer;
-        outline: none;
-    }
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p { font-weight: bold; color: #D81B60; font-size: 1.1rem; }
+    .task-box { border-left: 5px solid #D81B60; background-color: #fcfcfc; padding: 15px; margin-bottom: 15px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .task-title { color: #8E24AA; font-weight: bold; font-size: 1.15em; cursor: pointer; outline: none; }
     details > summary { list-style: none; }
     details > summary::-webkit-details-marker { display: none; }
-    .task-title::before {
-        content: "▶";
-        display: inline-block;
-        margin-right: 10px;
-        color: #D81B60;
-        font-size: 0.8em;
-        transition: transform 0.2s ease;
-    }
+    .task-title::before { content: "▶"; display: inline-block; margin-right: 10px; color: #D81B60; font-size: 0.8em; transition: transform 0.2s ease; }
     details[open] > .task-title::before { transform: rotate(90deg); }
-    .task-content {
-        margin-top: 12px;
-        padding-top: 12px;
-        border-top: 1px dashed #f8bbd0;
-        color: #333333;
-        line-height: 1.6;
-    }
-    div.stButton > button[kind="primary"], div.stFormSubmitButton > button {
-        background: linear-gradient(to right, #D81B60, #8E24AA) !important;
-        color: white !important;
-        text-transform: uppercase !important;
-        font-weight: bold !important;
-        border: none !important;
-        transition: 0.3s;
-    }
-    div.stButton > button[kind="secondary"] {
-        background: transparent !important;
-        color: #8E24AA !important;
-        border: 1.5px solid #D81B60 !important;
-        font-weight: bold !important;
-        border-radius: 8px !important;
-    }
+    .task-content { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #f8bbd0; color: #333333; line-height: 1.6; }
+    div.stButton > button[kind="primary"], div.stFormSubmitButton > button { background: linear-gradient(to right, #D81B60, #8E24AA) !important; color: white !important; text-transform: uppercase !important; font-weight: bold !important; border: none !important; transition: 0.3s; }
+    div.stButton > button[kind="secondary"] { background: transparent !important; color: #8E24AA !important; border: 1.5px solid #D81B60 !important; font-weight: bold !important; border-radius: 8px !important; }
     .process-box { background: linear-gradient(to right, #D81B60, #8E24AA); color: white; border-radius: 15px; padding: 12px; text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 5px; }
     .overdue-alert { background-color: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid #c62828; }
     .agenda-link { display: block; padding: 10px 15px; margin-bottom: 10px; text-decoration: none !important; color: #8E24AA !important; background-color: #fce4ec; border-radius: 8px; font-weight: bold; border-left: 4px solid #D81B60; }
@@ -114,9 +71,7 @@ ws_data, ws_tasks, ws_notes, ws_leadtime = get_google_sheets()
 
 # --- HÀM XỬ LÝ DỮ LIỆU LOGIC TỪ LEADTIME SHEET ---
 def load_and_sync_tasks():
-    # 1. Fetch Dữ liệu gốc
-    if "source_data" not in st.session_state:
-        st.session_state.source_data = ws_data.get_all_records()
+    if "source_data" not in st.session_state: st.session_state.source_data = ws_data.get_all_records()
     df_data = pd.DataFrame(st.session_state.source_data)
     
     if 'Ngày sinh nhật' in df_data.columns and 'Ngày giao bánh' in df_data.columns:
@@ -131,22 +86,16 @@ def load_and_sync_tasks():
         if t: bday_map[t] = str(r.get('Ngày sinh nhật', ''))
     st.session_state.birthday_map = bday_map
     
-    # 2. Fetch Leadtime Rule
-    if "leadtime_data" not in st.session_state:
-        st.session_state.leadtime_data = ws_leadtime.get_all_records()
+    if "leadtime_data" not in st.session_state: st.session_state.leadtime_data = ws_leadtime.get_all_records()
     df_leadtime = pd.DataFrame(st.session_state.leadtime_data)
     
-    # 3. Fetch Tasks hiện tại
-    if "tasks_data" not in st.session_state:
-        st.session_state.tasks_data = ws_tasks.get_all_records()
-        
+    if "tasks_data" not in st.session_state: st.session_state.tasks_data = ws_tasks.get_all_records()
     df_tasks = pd.DataFrame(st.session_state.tasks_data)
     existing_task_ids = df_tasks['Task_ID'].astype(str).tolist() if not df_tasks.empty else []
     
     new_tasks_to_add = []
     new_tasks_for_state = []
     
-    # 4. Generate Task dựa trên Rule Leadtime
     for idx, row in df_data.iterrows():
         ten = str(row.get('Tên', '')).strip()
         if not ten: continue
@@ -161,16 +110,11 @@ def load_and_sync_tasks():
         if sdt and not sdt.startswith('0') and sdt.isdigit(): sdt = '0' + sdt
         
         tasks_to_create = []
+        tasks_to_create.append((ngay_giao, "Giao bánh")) # Task chốt
         
-        # Luôn chốt lịch 1 task gốc là "Giao bánh"
-        tasks_to_create.append((ngay_giao, "Giao bánh"))
-        
-        # LOGIC ĐỌC LEADTIME TỰ ĐỘNG
-        # Python hiểu: Nếu TPHCM thì lấy "TPHCM", còn mọi thứ khác (Hà Nội, Cần Thơ...) quy về "Khác TPHCM"
+        # CHỈ ĐỌC TỪ LEADTIME SHEET (ĐÃ CẮT BỎ HARDCODE CŨ)
         rule_tp = "TPHCM" if tp == "TPHCM" else "Khác TPHCM"
-        
         if not df_leadtime.empty:
-            # Lọc ra đúng dòng quy tắc cho Khách này
             rules = df_leadtime[(df_leadtime['Loại bánh'].str.lower() == loai_banh.lower()) & (df_leadtime['TP'] == rule_tp)]
             for _, rule in rules.iterrows():
                 try:
@@ -181,7 +125,6 @@ def load_and_sync_tasks():
                         tasks_to_create.append((t_date, t_name))
                 except: pass
             
-        # LOGIC GỬI DRIVE CMSN (Giữ nguyên)
         bday_str = str(row.get('Ngày sinh nhật', '')).strip()
         if bday_str:
             parts = bday_str.split('/')
@@ -215,7 +158,6 @@ if not df_tasks.empty:
 
 today = (datetime.utcnow() + timedelta(hours=7)).date()
 
-# ĐỘNG HOÁ STANDARD TASKS DỰA VÀO SHEET LEADTIME
 STANDARD_TASKS = ["Giao bánh", "Gửi Drive CMSN"]
 if "leadtime_data" in st.session_state:
     df_ld = pd.DataFrame(st.session_state.leadtime_data)
@@ -244,8 +186,7 @@ def edit_single_task_dialog(task_id):
             ws_tasks.update_cell(task_idx + 2, 2, new_date.strftime("%d/%m/%Y"))
             ws_tasks.update_cell(task_idx + 2, 6, new_name)
             ws_tasks.update_cell(task_idx + 2, 10, new_note)
-            st.session_state.clear()
-            st.rerun()
+            st.session_state.clear(); st.rerun()
 
 @st.dialog("🔍 THÔNG TIN CHI TIẾT")
 def show_detail_dialog(person_name):
@@ -255,13 +196,10 @@ def show_detail_dialog(person_name):
         
     p_data = df_tasks[df_tasks['Tên người nhận'] == person_name].iloc[0]
     bday = st.session_state.birthday_map.get(person_name, "Không rõ")
-    
     orig_df = pd.DataFrame(st.session_state.source_data)
     p_idx = orig_df.index[orig_df['Tên'] == person_name].tolist()
     
-    ngay_giao = "Không rõ"
-    if p_idx: ngay_giao = str(orig_df.iloc[p_idx[0]].get('Ngày giao bánh', 'Không rõ')).strip()
-    
+    ngay_giao = str(orig_df.iloc[p_idx[0]].get('Ngày giao bánh', 'Không rõ')).strip() if p_idx else "Không rõ"
     sdt = str(p_data['SĐT']).strip()
     if sdt.endswith('.0'): sdt = sdt[:-2]
     if sdt and not sdt.startswith('0') and sdt.isdigit(): sdt = '0' + sdt
@@ -282,10 +220,7 @@ def show_detail_dialog(person_name):
 
     st.markdown("---")
     with st.expander("⚙️ SỬA ĐƠN HÀNG GỐC (Tự động tính lại Task)"):
-        if not p_idx:
-            st.error("Không tìm thấy dữ liệu gốc trong Sheet Data.")
-            return
-            
+        if not p_idx: st.error("Không tìm thấy dữ liệu gốc trong Sheet Data."); return
         row_idx = p_idx[0]
         p_orig = orig_df.iloc[row_idx]
         headers = orig_df.columns.tolist()
@@ -311,20 +246,16 @@ def show_detail_dialog(person_name):
                 if 'Ngày sinh nhật' in headers: ws_data.update_cell(row_idx+2, headers.index('Ngày sinh nhật')+1, new_bday)
                 if 'Lưu ý' in headers: ws_data.update_cell(row_idx+2, headers.index('Lưu ý')+1, new_note)
                 
-                # Logic Xóa: CHỈ xóa Task tự động tạo (bỏ qua những task ID chứa chữ Manual_)
                 df_tasks_temp = pd.DataFrame(st.session_state.tasks_data)
                 tasks_to_delete = df_tasks_temp[(df_tasks_temp['Tên người nhận'] == person_name) & (~df_tasks_temp['Task_ID'].astype(str).str.startswith('Manual_'))]
-                task_indices = tasks_to_delete.index.tolist()
-                for i in sorted(task_indices, reverse=True): ws_tasks.delete_rows(i + 2)
+                for i in sorted(tasks_to_delete.index.tolist(), reverse=True): ws_tasks.delete_rows(i + 2)
                     
-                st.session_state.clear()
-                st.rerun()
+                st.session_state.clear(); st.rerun()
 
 # --- SIDEBAR & BỘ LỌC TÌM KIẾM ---
 with st.sidebar:
     st.markdown("### ⚙️ QUẢN TRỊ")
-    if st.button("🔄 LÀM MỚI DỮ LIỆU", type="primary"):
-        st.session_state.clear(); st.rerun()
+    if st.button("🔄 LÀM MỚI DỮ LIỆU", type="primary"): st.session_state.clear(); st.rerun()
     st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets.")
     st.markdown("---")
     st.markdown("### 🔍 BỘ LỌC NHANH")
@@ -334,7 +265,6 @@ with st.sidebar:
     
     filter_names = st.multiselect("👤 Tìm theo Khách hàng:", all_names, placeholder="Tất cả...")
     filter_banh = st.multiselect("🍰 Tìm theo Loại Bánh:", all_banh, placeholder="Tất cả...")
-    
     filter_tasks_options = STANDARD_TASKS + ["Khác"]
     filter_tasks = st.multiselect("🏷️ Tìm theo Loại Task:", filter_tasks_options, placeholder="Tất cả...")
     filter_status = st.multiselect("🚦 Trạng thái:", ["Chưa hoàn thành", "Hoàn thành"], default=["Chưa hoàn thành", "Hoàn thành"])
@@ -412,9 +342,7 @@ with tab_todo:
     ])
     
     def render_task_list(df_render, tab_key_suffix):
-        if df_render.empty:
-            st.info("Không có task nào thỏa mãn điều kiện!")
-            return
+        if df_render.empty: st.info("Không có task nào thỏa mãn điều kiện!"); return
         df_render = df_render.sort_values(by='Ngày thực hiện', ascending=True)
         for _, r in df_render.iterrows():
             date_str = r['Ngày thực hiện'].strftime('%d/%m/%Y')
@@ -443,6 +371,8 @@ with tab_todo:
             with c1:
                 is_done = r['Trạng thái'] == "Hoàn thành"
                 checked = st.checkbox(f"Hoàn thành task: {r['Tên Task']}", value=is_done, key=f"{r['Task_ID']}_{tab_key_suffix}")
+                
+                # BỎ ST.RERUN() Ở ĐÂY ĐỂ KHÔNG BỊ NHẢY TAB NỮA
                 if checked != is_done:
                     new_val = "Hoàn thành" if checked else "Chưa hoàn thành"
                     for real_idx, task_dict in enumerate(st.session_state.tasks_data):
@@ -450,7 +380,6 @@ with tab_todo:
                             ws_tasks.update_cell(real_idx + 2, 11, new_val)
                             st.session_state.tasks_data[real_idx]['Trạng thái'] = new_val
                             break
-                    st.rerun()
             with c2:
                 if st.button("✏️ Edit", key=f"edit_btn_{r['Task_ID']}_{tab_key_suffix}"):
                     edit_single_task_dialog(r['Task_ID'])
@@ -466,15 +395,20 @@ with tab_todo:
 st.write("---")
 
 # ==========================================
-# 2. ADD TASK
+# 2. ADD TASK MỚI (CÓ TÍNH NĂNG LẶP LẠI)
 # ==========================================
 st.markdown("<div id='section-add-task'></div><h2>ADD THÊM TASK MỚI</h2>", unsafe_allow_html=True)
 list_names = [n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]
 
 with st.form("add_task_form", clear_on_submit=True):
     belong_to = st.selectbox("Task này thuộc:", list_names + ["Khác"])
-    task_date = st.date_input("Ngày thực hiện")
     task_name = st.text_input("Task (Fill vào)")
+    task_date = st.date_input("Ngày bắt đầu thực hiện")
+    
+    col_rep1, col_rep2 = st.columns(2)
+    with col_rep1: repeat_freq = st.selectbox("Tần suất lặp:", ["Không lặp lại", "Hàng tuần", "Hàng tháng"])
+    with col_rep2: repeat_count = st.number_input("Số lần lặp (nếu có):", min_value=1, max_value=24, value=1)
+    
     submitted = st.form_submit_button("CREATE TASK", type="primary")
     msg_placeholder = st.empty() 
     
@@ -488,13 +422,35 @@ with st.form("add_task_form", clear_on_submit=True):
             if sdt.endswith('.0'): sdt = sdt[:-2]
             if sdt and not sdt.startswith('0') and sdt.isdigit(): sdt = '0' + sdt
             
-        new_id = f"Manual_{belong_to}_{(datetime.utcnow() + timedelta(hours=7)).strftime('%Y%m%d%H%M%S')}"
-        ws_tasks.append_row([new_id, task_date.strftime("%d/%m/%Y"), belong_to, tp, loai, task_name, thiep, sdt, diachi, luuy, "Chưa hoàn thành"])
-        st.session_state.tasks_data.append({
-            "Task_ID": new_id, "Ngày thực hiện": task_date.strftime("%d/%m/%Y"), "Tên người nhận": belong_to, "TP": tp, "Loại bánh": loai, 
-            "Tên Task": task_name, "Tên trên thiệp": thiep, "SĐT": sdt, "Địa chỉ": diachi, "Lưu ý": luuy, "Trạng thái": "Chưa hoàn thành"
-        })
-        msg_placeholder.success("Đã thêm task thành công!")
+        loop_count = repeat_count if repeat_freq != "Không lặp lại" else 1
+        rows_to_append = []
+        
+        for i in range(loop_count):
+            if repeat_freq == "Hàng tuần":
+                t_date = task_date + timedelta(days=7*i)
+            elif repeat_freq == "Hàng tháng":
+                m = task_date.month - 1 + i
+                y = task_date.year + m // 12
+                m = m % 12 + 1
+                day = task_date.day
+                # Check ngày cuối tháng thông minh (VD: 31/01 -> 28/02)
+                while True:
+                    try: t_date = task_date.replace(year=y, month=m, day=day); break
+                    except ValueError: day -= 1
+            else:
+                t_date = task_date
+                
+            new_id = f"Manual_{belong_to}_{(datetime.utcnow() + timedelta(hours=7)).strftime('%Y%m%d%H%M%S')}_{i}"
+            row_data = [new_id, t_date.strftime("%d/%m/%Y"), belong_to, tp, loai, task_name, thiep, sdt, diachi, luuy, "Chưa hoàn thành"]
+            rows_to_append.append(row_data)
+            
+            st.session_state.tasks_data.append({
+                "Task_ID": new_id, "Ngày thực hiện": t_date.strftime("%d/%m/%Y"), "Tên người nhận": belong_to, "TP": tp, "Loại bánh": loai, 
+                "Tên Task": task_name, "Tên trên thiệp": thiep, "SĐT": sdt, "Địa chỉ": diachi, "Lưu ý": luuy, "Trạng thái": "Chưa hoàn thành"
+            })
+            
+        ws_tasks.append_rows(rows_to_append)
+        msg_placeholder.success(f"Đã thêm thành công {loop_count} task!")
         time.sleep(1.2)
         st.rerun()
 
@@ -547,13 +503,10 @@ if not df_sum.empty:
     
     # --- VẼ 2 BIỂU ĐỒ (DASHBOARD) ---
     chart_col1, chart_col2 = st.columns(2)
-    
-    # Lọc bỏ tháng "Không rõ" để vẽ biểu đồ
     df_chart = df_final[df_final['Month_Str'] != "Không rõ"]
     sorted_chart_months = [m for m in sorted_months if m != "Không rõ"]
 
     if not df_chart.empty:
-        # BIỂU ĐỒ 1: Tình trạng & Tổng Đơn
         ny_counts = [len(df_chart[(df_chart['Month_Str'] == m) & (df_chart['Status'] == 'Not Yet')]) for m in sorted_chart_months]
         ip_counts = [len(df_chart[(df_chart['Month_Str'] == m) & (df_chart['Status'] == 'In Progress')]) for m in sorted_chart_months]
         cp_counts = [len(df_chart[(df_chart['Month_Str'] == m) & (df_chart['Status'] == 'Completed')]) for m in sorted_chart_months]
@@ -565,10 +518,8 @@ if not df_sum.empty:
         fig1.add_trace(go.Bar(name='Completed', x=sorted_chart_months, y=cp_counts, marker_color='#8E24AA', text=[v if v>0 else "" for v in cp_counts], textposition='auto'))
         fig1.add_trace(go.Scatter(name='Total', x=sorted_chart_months, y=total_counts, mode='lines+markers+text', marker=dict(color='#D81B60', size=8), line=dict(color='#D81B60', width=2, dash='dot'), text=[v if v>0 else "" for v in total_counts], textposition='top center'))
         fig1.update_layout(barmode='stack', title="Tiến độ & Tổng đơn / Tháng", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", y=-0.2, yanchor="top"), margin=dict(t=40, l=10, r=10, b=10))
-        
         with chart_col1: st.plotly_chart(fig1, use_container_width=True)
 
-        # BIỂU ĐỒ 2: Phân bổ Loại Bánh theo Khu vực
         x_months = []
         x_locs = []
         y_gato = []
@@ -586,10 +537,9 @@ if not df_sum.empty:
         fig2.add_trace(go.Bar(name='Gato', x=[x_months, x_locs], y=y_gato, marker_color='#D81B60', text=[v if v>0 else "" for v in y_gato], textposition='auto'))
         fig2.add_trace(go.Bar(name='Cookies', x=[x_months, x_locs], y=y_cookie, marker_color='#8E24AA', text=[v if v>0 else "" for v in y_cookie], textposition='auto'))
         fig2.update_layout(barmode='stack', title="Phân bổ Loại Bánh & Khu vực", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", y=-0.2, yanchor="top"), margin=dict(t=40, l=10, r=10, b=10))
-        
         with chart_col2: st.plotly_chart(fig2, use_container_width=True)
 
-    # --- CHẾ ĐỘ VIEW (CŨ) ---
+    # --- CHẾ ĐỘ VIEW ---
     if "Laptop mode" in view_mode:
         status_cols = st.columns(3)
         with status_cols[0]: st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
