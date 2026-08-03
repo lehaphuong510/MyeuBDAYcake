@@ -516,7 +516,7 @@ if not df_sum.empty:
         fig1.add_trace(go.Bar(name='In Progress', x=sorted_chart_months, y=ip_counts, marker_color='#CE93D8', text=[v if v>0 else "" for v in ip_counts], textposition='auto'))
         fig1.add_trace(go.Bar(name='Completed', x=sorted_chart_months, y=cp_counts, marker_color='#8E24AA', text=[v if v>0 else "" for v in cp_counts], textposition='auto'))
         fig1.add_trace(go.Scatter(name='Total', x=sorted_chart_months, y=total_counts, mode='lines+markers+text', marker=dict(color='#D81B60', size=8), line=dict(color='#D81B60', width=2, dash='dot'), text=[v if v>0 else "" for v in total_counts], textposition='top center'))
-        fig1.update_layout(barmode='stack', title="Tiến độ & Tổng đơn / Tháng", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", ybottom=-0.2), margin=dict(t=40, l=10, r=10, b=10))
+        fig1.update_layout(barmode='stack', title="Tiến độ & Tổng đơn / Tháng", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", y=-0.2, yanchor="top"), margin=dict(t=40, l=10, r=10, b=10))
         
         with chart_col1: st.plotly_chart(fig1, use_container_width=True)
 
@@ -537,7 +537,7 @@ if not df_sum.empty:
         fig2 = go.Figure()
         fig2.add_trace(go.Bar(name='Gato', x=[x_months, x_locs], y=y_gato, marker_color='#D81B60', text=[v if v>0 else "" for v in y_gato], textposition='auto'))
         fig2.add_trace(go.Bar(name='Cookies', x=[x_months, x_locs], y=y_cookie, marker_color='#8E24AA', text=[v if v>0 else "" for v in y_cookie], textposition='auto'))
-        fig2.update_layout(barmode='stack', title="Phân bổ Loại Bánh & Khu vực", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", ybottom=-0.2), margin=dict(t=40, l=10, r=10, b=10))
+        fig2.update_layout(barmode='stack', title="Phân bổ Loại Bánh & Khu vực", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", y=-0.2, yanchor="top"), margin=dict(t=40, l=10, r=10, b=10))
         
         with chart_col2: st.plotly_chart(fig2, use_container_width=True)
 
