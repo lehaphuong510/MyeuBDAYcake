@@ -266,20 +266,15 @@ def show_detail_dialog(person_name):
             new_note = st.text_area("Lưu ý chung", str(p_orig.get('Lưu ý', '')))
             
             if st.form_submit_button("🔄 LƯU & TẠO LẠI TASK", type="primary"):
-                # 1. Update vào Data (Sheet gốc) - row_idx + 2 vì Python 0-index và dòng 1 là Header
                 ws_data.update_cell(row_idx+2, headers.index('TP')+1, new_tp)
                 ws_data.update_cell(row_idx+2, headers.index('Loại bánh')+1, new_loai)
                 ws_data.update_cell(row_idx+2, headers.index('Ngày giao bánh')+1, new_ngay.strftime("%d/%m/%Y"))
-                if 'Ngày sinh nhật' in headers:
-                    ws_data.update_cell(row_idx+2, headers.index('Ngày sinh nhật')+1, new_bday)
-                if 'Lưu ý' in headers:
-                    ws_data.update_cell(row_idx+2, headers.index('Lưu ý')+1, new_note)
+                if 'Ngày sinh nhật' in headers: ws_data.update_cell(row_idx+2, headers.index('Ngày sinh nhật')+1, new_bday)
+                if 'Lưu ý' in headers: ws_data.update_cell(row_idx+2, headers.index('Lưu ý')+1, new_note)
                 
-                # 2. Xóa toàn bộ task cũ của người này (từ dưới lên để khỏi loạn index)
                 df_tasks_temp = pd.DataFrame(st.session_state.tasks_data)
                 task_indices = df_tasks_temp.index[df_tasks_temp['Tên người nhận'] == person_name].tolist()
-                for i in sorted(task_indices, reverse=True):
-                    ws_tasks.delete_rows(i + 2)
+                for i in sorted(task_indices, reverse=True): ws_tasks.delete_rows(i + 2)
                     
                 st.session_state.clear()
                 st.rerun()
@@ -462,13 +457,12 @@ st.write("---")
 # 3. OVERALL PROCESS
 # ==========================================
 st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
-view_mode = st.selectbox("👁️ CHỌN GÓC NHÌN TỔNG QUAN:", ["💻 Laptop mode", "📱 Mobile mode - Status Focused", "📱 Mobile mode - Time Focused"])
-st.write("")
 
+# TÍNH TOÁN DATA TỔNG QUAN (CHỊU ẢNH HƯỞNG BỞI FILTER)
 person_summary = []
 orig_df = pd.DataFrame(st.session_state.source_data) if 'source_data' in st.session_state else pd.DataFrame()
 
-for name, group in df_tasks.groupby('Tên người nhận'):
+for name, group in df_filtered.groupby('Tên người nhận'):
     if name == "Khác": continue
     total = len(group)
     done = len(group[group['Trạng thái'] == "Hoàn thành"])
@@ -502,6 +496,54 @@ if not df_sum.empty:
         sorted_months.append("Không rõ")
         
     df_final = pd.concat([df_valid, df_invalid])
+    
+    # --- VẼ 2 BIỂU ĐỒ (DASHBOARD) ---
+    chart_col1, chart_col2 = st.columns(2)
+    
+    # Lọc bỏ tháng "Không rõ" để vẽ biểu đồ
+    df_chart = df_final[df_final['Month_Str'] != "Không rõ"]
+    sorted_chart_months = [m for m in sorted_months if m != "Không rõ"]
+
+    if not df_chart.empty:
+        # BIỂU ĐỒ 1: Tình trạng & Tổng Đơn
+        ny_counts = [len(df_chart[(df_chart['Month_Str'] == m) & (df_chart['Status'] == 'Not Yet')]) for m in sorted_chart_months]
+        ip_counts = [len(df_chart[(df_chart['Month_Str'] == m) & (df_chart['Status'] == 'In Progress')]) for m in sorted_chart_months]
+        cp_counts = [len(df_chart[(df_chart['Month_Str'] == m) & (df_chart['Status'] == 'Completed')]) for m in sorted_chart_months]
+        total_counts = [ny + ip + cp for ny, ip, cp in zip(ny_counts, ip_counts, cp_counts)]
+
+        fig1 = go.Figure()
+        fig1.add_trace(go.Bar(name='Not Yet', x=sorted_chart_months, y=ny_counts, marker_color='#E0E0E0', text=[v if v>0 else "" for v in ny_counts], textposition='auto'))
+        fig1.add_trace(go.Bar(name='In Progress', x=sorted_chart_months, y=ip_counts, marker_color='#CE93D8', text=[v if v>0 else "" for v in ip_counts], textposition='auto'))
+        fig1.add_trace(go.Bar(name='Completed', x=sorted_chart_months, y=cp_counts, marker_color='#8E24AA', text=[v if v>0 else "" for v in cp_counts], textposition='auto'))
+        fig1.add_trace(go.Scatter(name='Total', x=sorted_chart_months, y=total_counts, mode='lines+markers+text', marker=dict(color='#D81B60', size=8), line=dict(color='#D81B60', width=2, dash='dot'), text=[v if v>0 else "" for v in total_counts], textposition='top center'))
+        fig1.update_layout(barmode='stack', title="Tiến độ & Tổng đơn / Tháng", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", ybottom=-0.2), margin=dict(t=40, l=10, r=10, b=10))
+        
+        with chart_col1: st.plotly_chart(fig1, use_container_width=True)
+
+        # BIỂU ĐỒ 2: Phân bổ Loại Bánh theo Khu vực (Grouped & Stacked)
+        x_months = []
+        x_locs = []
+        y_gato = []
+        y_cookie = []
+
+        for m in sorted_chart_months:
+            for loc in ["TP.HCM", "KHÁC"]:
+                x_months.append(m)
+                x_locs.append(loc)
+                sub = df_chart[(df_chart['Month_Str'] == m) & (df_chart['Loc'] == loc)]
+                y_gato.append(len(sub[sub['Loại bánh'].str.lower() == 'gato']))
+                y_cookie.append(len(sub[sub['Loại bánh'].str.lower() == 'cookies']))
+
+        fig2 = go.Figure()
+        fig2.add_trace(go.Bar(name='Gato', x=[x_months, x_locs], y=y_gato, marker_color='#D81B60', text=[v if v>0 else "" for v in y_gato], textposition='auto'))
+        fig2.add_trace(go.Bar(name='Cookies', x=[x_months, x_locs], y=y_cookie, marker_color='#8E24AA', text=[v if v>0 else "" for v in y_cookie], textposition='auto'))
+        fig2.update_layout(barmode='stack', title="Phân bổ Loại Bánh & Khu vực", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", ybottom=-0.2), margin=dict(t=40, l=10, r=10, b=10))
+        
+        with chart_col2: st.plotly_chart(fig2, use_container_width=True)
+
+    # --- CHẾ ĐỘ VIEW (CŨ) ---
+    view_mode = st.selectbox("👁️ CHỌN GÓC NHÌN CHI TIẾT:", ["💻 Laptop mode", "📱 Mobile mode - Status Focused", "📱 Mobile mode - Time Focused"])
+    st.write("")
 
     if "Laptop mode" in view_mode:
         status_cols = st.columns(3)
