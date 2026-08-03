@@ -97,16 +97,24 @@ def get_google_sheets():
     ws_data = sheet.worksheet("Data")
     ws_tasks = sheet.worksheet("Tasks")
     sheet_titles = [w.title for w in sheet.worksheets()]
+    
     if "Notes" not in sheet_titles:
         ws_notes = sheet.add_worksheet(title="Notes", rows="100", cols="2")
         ws_notes.append_row(["Thời gian", "Nội dung Note"])
     else: ws_notes = sheet.worksheet("Notes")
-    return ws_data, ws_tasks, ws_notes
+        
+    if "Leadtime" not in sheet_titles:
+        ws_leadtime = sheet.add_worksheet(title="Leadtime", rows="100", cols="5")
+        ws_leadtime.append_row(["Loại bánh", "TP", "Task", "Leadtime", "Tính từ task"])
+    else: ws_leadtime = sheet.worksheet("Leadtime")
+        
+    return ws_data, ws_tasks, ws_notes, ws_leadtime
 
-ws_data, ws_tasks, ws_notes = get_google_sheets()
+ws_data, ws_tasks, ws_notes, ws_leadtime = get_google_sheets()
 
-# --- HÀM XỬ LÝ DỮ LIỆU LOGIC ---
+# --- HÀM XỬ LÝ DỮ LIỆU LOGIC TỪ LEADTIME SHEET ---
 def load_and_sync_tasks():
+    # 1. Fetch Dữ liệu gốc
     if "source_data" not in st.session_state:
         st.session_state.source_data = ws_data.get_all_records()
     df_data = pd.DataFrame(st.session_state.source_data)
@@ -123,6 +131,12 @@ def load_and_sync_tasks():
         if t: bday_map[t] = str(r.get('Ngày sinh nhật', ''))
     st.session_state.birthday_map = bday_map
     
+    # 2. Fetch Leadtime Rule
+    if "leadtime_data" not in st.session_state:
+        st.session_state.leadtime_data = ws_leadtime.get_all_records()
+    df_leadtime = pd.DataFrame(st.session_state.leadtime_data)
+    
+    # 3. Fetch Tasks hiện tại
     if "tasks_data" not in st.session_state:
         st.session_state.tasks_data = ws_tasks.get_all_records()
         
@@ -132,6 +146,7 @@ def load_and_sync_tasks():
     new_tasks_to_add = []
     new_tasks_for_state = []
     
+    # 4. Generate Task dựa trên Rule Leadtime
     for idx, row in df_data.iterrows():
         ten = str(row.get('Tên', '')).strip()
         if not ten: continue
@@ -146,11 +161,27 @@ def load_and_sync_tasks():
         if sdt and not sdt.startswith('0') and sdt.isdigit(): sdt = '0' + sdt
         
         tasks_to_create = []
-        if tp == 'TPHCM' or (tp != 'TPHCM' and loai_banh == 'Gato'):
-            tasks_to_create = [(ngay_giao - timedelta(days=4), "Remind tiệm bánh"), (ngay_giao - timedelta(days=1), "Follow up"), (ngay_giao, "Giao bánh")]
-        elif tp != 'TPHCM' and loai_banh == 'Cookies':
-            tasks_to_create = [(ngay_giao - timedelta(days=8), "Thông báo với tiệm bánh"), (ngay_giao - timedelta(days=4), "Đặt đơn ship"), (ngay_giao - timedelta(days=1), "Remind shipper"), (ngay_giao, "Giao bánh")]
+        
+        # Luôn chốt lịch 1 task gốc là "Giao bánh"
+        tasks_to_create.append((ngay_giao, "Giao bánh"))
+        
+        # LOGIC ĐỌC LEADTIME TỰ ĐỘNG
+        # Python hiểu: Nếu TPHCM thì lấy "TPHCM", còn mọi thứ khác (Hà Nội, Cần Thơ...) quy về "Khác TPHCM"
+        rule_tp = "TPHCM" if tp == "TPHCM" else "Khác TPHCM"
+        
+        if not df_leadtime.empty:
+            # Lọc ra đúng dòng quy tắc cho Khách này
+            rules = df_leadtime[(df_leadtime['Loại bánh'].str.lower() == loai_banh.lower()) & (df_leadtime['TP'] == rule_tp)]
+            for _, rule in rules.iterrows():
+                try:
+                    days_to_sub = int(rule['Leadtime'])
+                    t_name = str(rule['Task']).strip()
+                    if t_name and t_name.lower() != "giao bánh": 
+                        t_date = ngay_giao - timedelta(days=days_to_sub)
+                        tasks_to_create.append((t_date, t_name))
+                except: pass
             
+        # LOGIC GỬI DRIVE CMSN (Giữ nguyên)
         bday_str = str(row.get('Ngày sinh nhật', '')).strip()
         if bday_str:
             parts = bday_str.split('/')
@@ -183,7 +214,15 @@ if not df_tasks.empty:
     df_tasks['Ngày thực hiện'] = pd.to_datetime(df_tasks['Ngày thực hiện'], format="%d/%m/%Y", errors='coerce')
 
 today = (datetime.utcnow() + timedelta(hours=7)).date()
-STANDARD_TASKS = ["Remind tiệm bánh", "Follow up", "Giao bánh", "Thông báo với tiệm bánh", "Đặt đơn ship", "Remind shipper", "Gửi Drive CMSN"]
+
+# ĐỘNG HOÁ STANDARD TASKS DỰA VÀO SHEET LEADTIME
+STANDARD_TASKS = ["Giao bánh", "Gửi Drive CMSN"]
+if "leadtime_data" in st.session_state:
+    df_ld = pd.DataFrame(st.session_state.leadtime_data)
+    if not df_ld.empty:
+        for t in df_ld['Task'].unique():
+            if str(t).strip() and str(t).strip() not in STANDARD_TASKS:
+                STANDARD_TASKS.append(str(t).strip())
 
 # --- CÁC HÀM XỬ LÝ CHỈNH SỬA (DIALOGS) ---
 
@@ -252,7 +291,7 @@ def show_detail_dialog(person_name):
         headers = orig_df.columns.tolist()
         
         with st.form(f"edit_root_{person_name}"):
-            st.caption("Lưu ý: Sửa ở đây sẽ xóa hết Task cũ và tạo lại toàn bộ Task mới theo Leadtime.")
+            st.caption("Sửa thông tin gốc sẽ tự động TẠO LẠI các task hệ thống. (Vẫn giữ nguyên các note tay 'Manual').")
             c1, c2 = st.columns(2)
             with c1:
                 new_tp = st.selectbox("Thành phố", ["TPHCM", "Khác"], index=0 if p_orig.get('TP') == "TPHCM" else 1)
@@ -272,8 +311,10 @@ def show_detail_dialog(person_name):
                 if 'Ngày sinh nhật' in headers: ws_data.update_cell(row_idx+2, headers.index('Ngày sinh nhật')+1, new_bday)
                 if 'Lưu ý' in headers: ws_data.update_cell(row_idx+2, headers.index('Lưu ý')+1, new_note)
                 
+                # Logic Xóa: CHỈ xóa Task tự động tạo (bỏ qua những task ID chứa chữ Manual_)
                 df_tasks_temp = pd.DataFrame(st.session_state.tasks_data)
-                task_indices = df_tasks_temp.index[df_tasks_temp['Tên người nhận'] == person_name].tolist()
+                tasks_to_delete = df_tasks_temp[(df_tasks_temp['Tên người nhận'] == person_name) & (~df_tasks_temp['Task_ID'].astype(str).str.startswith('Manual_'))]
+                task_indices = tasks_to_delete.index.tolist()
                 for i in sorted(task_indices, reverse=True): ws_tasks.delete_rows(i + 2)
                     
                 st.session_state.clear()
@@ -287,8 +328,13 @@ with st.sidebar:
     st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets.")
     st.markdown("---")
     st.markdown("### 🔍 BỘ LỌC NHANH")
+    
     all_names = sorted(list(set([n for n in df_tasks['Tên người nhận'].unique() if n and n != "Khác"]))) if not df_tasks.empty else []
+    all_banh = sorted(list(set([b for b in df_tasks['Loại bánh'].unique() if b]))) if not df_tasks.empty else []
+    
     filter_names = st.multiselect("👤 Tìm theo Khách hàng:", all_names, placeholder="Tất cả...")
+    filter_banh = st.multiselect("🍰 Tìm theo Loại Bánh:", all_banh, placeholder="Tất cả...")
+    
     filter_tasks_options = STANDARD_TASKS + ["Khác"]
     filter_tasks = st.multiselect("🏷️ Tìm theo Loại Task:", filter_tasks_options, placeholder="Tất cả...")
     filter_status = st.multiselect("🚦 Trạng thái:", ["Chưa hoàn thành", "Hoàn thành"], default=["Chưa hoàn thành", "Hoàn thành"])
@@ -304,6 +350,7 @@ with st.sidebar:
 df_filtered = df_tasks.copy()
 if not df_filtered.empty:
     if filter_names: df_filtered = df_filtered[df_filtered['Tên người nhận'].isin(filter_names)]
+    if filter_banh: df_filtered = df_filtered[df_filtered['Loại bánh'].isin(filter_banh)]
     if filter_tasks:
         if "Khác" in filter_tasks:
             selected_st_tasks = [t for t in filter_tasks if t != "Khác"]
@@ -457,8 +504,9 @@ st.write("---")
 # 3. OVERALL PROCESS
 # ==========================================
 st.markdown("<h2 id='overall-process'>OVERALL PROCESS</h2>", unsafe_allow_html=True)
+view_mode = st.selectbox("👁️ CHỌN GÓC NHÌN TỔNG QUAN:", ["💻 Laptop mode", "📱 Mobile mode - Status Focused", "📱 Mobile mode - Time Focused"])
+st.write("")
 
-# TÍNH TOÁN DATA TỔNG QUAN (CHỊU ẢNH HƯỞNG BỞI FILTER)
 person_summary = []
 orig_df = pd.DataFrame(st.session_state.source_data) if 'source_data' in st.session_state else pd.DataFrame()
 
@@ -520,7 +568,7 @@ if not df_sum.empty:
         
         with chart_col1: st.plotly_chart(fig1, use_container_width=True)
 
-        # BIỂU ĐỒ 2: Phân bổ Loại Bánh theo Khu vực (Grouped & Stacked)
+        # BIỂU ĐỒ 2: Phân bổ Loại Bánh theo Khu vực
         x_months = []
         x_locs = []
         y_gato = []
@@ -542,9 +590,6 @@ if not df_sum.empty:
         with chart_col2: st.plotly_chart(fig2, use_container_width=True)
 
     # --- CHẾ ĐỘ VIEW (CŨ) ---
-    view_mode = st.selectbox("👁️ CHỌN GÓC NHÌN CHI TIẾT:", ["💻 Laptop mode", "📱 Mobile mode - Status Focused", "📱 Mobile mode - Time Focused"])
-    st.write("")
-
     if "Laptop mode" in view_mode:
         status_cols = st.columns(3)
         with status_cols[0]: st.markdown("<div class='process-box'>⏳ NOT YET</div>", unsafe_allow_html=True)
