@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from streamlit_calendar import calendar
 import plotly.graph_objects as go
 import time
@@ -112,7 +112,6 @@ def load_and_sync_tasks():
         tasks_to_create = []
         tasks_to_create.append((ngay_giao, "Giao bánh")) # Task chốt
         
-        # CHỈ ĐỌC TỪ LEADTIME SHEET (ĐÃ CẮT BỎ HARDCODE CŨ)
         rule_tp = "TPHCM" if tp == "TPHCM" else "Khác TPHCM"
         if not df_leadtime.empty:
             rules = df_leadtime[(df_leadtime['Loại bánh'].str.lower() == loai_banh.lower()) & (df_leadtime['TP'] == rule_tp)]
@@ -147,6 +146,7 @@ def load_and_sync_tasks():
                 existing_task_ids.append(task_id)
                 
     if new_tasks_to_add:
+        # BATCH UPDATE: Gọi 1 hàm duy nhất nối hàng loạt dòng mới
         ws_tasks.append_rows(new_tasks_to_add)
         st.session_state.tasks_data.extend(new_tasks_for_state)
         df_tasks = pd.DataFrame(st.session_state.tasks_data)
@@ -156,7 +156,8 @@ df_tasks = load_and_sync_tasks()
 if not df_tasks.empty:
     df_tasks['Ngày thực hiện'] = pd.to_datetime(df_tasks['Ngày thực hiện'], format="%d/%m/%Y", errors='coerce')
 
-today = (datetime.utcnow() + timedelta(hours=7)).date()
+# FIX LỖI WARNING: Dùng timezone.utc thay cho utcnow() cũ của Python
+today = (datetime.now(timezone.utc) + timedelta(hours=7)).date()
 
 STANDARD_TASKS = ["Giao bánh", "Gửi Drive CMSN"]
 if "leadtime_data" in st.session_state:
@@ -182,10 +183,14 @@ def edit_single_task_dialog(task_id):
         new_name = st.text_input("Tên Task", t_data['Tên Task'])
         new_note = st.text_area("Lưu ý riêng cho Task này", t_data['Lưu ý'])
         
-        if st.form_submit_button("💾 LƯU THAY ĐỔI", type="primary"):
-            ws_tasks.update_cell(task_idx + 2, 2, new_date.strftime("%d/%m/%Y"))
-            ws_tasks.update_cell(task_idx + 2, 6, new_name)
-            ws_tasks.update_cell(task_idx + 2, 10, new_note)
+        if st.form_submit_button("💾 LƯU THAY ĐỔI"):
+            # BATCH UPDATE: Cập nhật 3 ô chỉ với 1 thao tác duy nhất
+            cells = [
+                gspread.Cell(task_idx + 2, 2, new_date.strftime("%d/%m/%Y")),
+                gspread.Cell(task_idx + 2, 6, new_name),
+                gspread.Cell(task_idx + 2, 10, new_note)
+            ]
+            ws_tasks.update_cells(cells)
             st.session_state.clear(); st.rerun()
 
 @st.dialog("🔍 THÔNG TIN CHI TIẾT")
@@ -239,23 +244,38 @@ def show_detail_dialog(person_name):
             
             new_note = st.text_area("Lưu ý chung", str(p_orig.get('Lưu ý', '')))
             
-            if st.form_submit_button("🔄 LƯU & TẠO LẠI TASK", type="primary"):
-                ws_data.update_cell(row_idx+2, headers.index('TP')+1, new_tp)
-                ws_data.update_cell(row_idx+2, headers.index('Loại bánh')+1, new_loai)
-                ws_data.update_cell(row_idx+2, headers.index('Ngày giao bánh')+1, new_ngay.strftime("%d/%m/%Y"))
-                if 'Ngày sinh nhật' in headers: ws_data.update_cell(row_idx+2, headers.index('Ngày sinh nhật')+1, new_bday)
-                if 'Lưu ý' in headers: ws_data.update_cell(row_idx+2, headers.index('Lưu ý')+1, new_note)
+            if st.form_submit_button("🔄 LƯU & TẠO LẠI TASK"):
+                # BATCH UPDATE 1: Cập nhật 5 ô dữ liệu gốc chỉ với 1 thao tác
+                cells_to_update = [
+                    gspread.Cell(row_idx+2, headers.index('TP')+1, new_tp),
+                    gspread.Cell(row_idx+2, headers.index('Loại bánh')+1, new_loai),
+                    gspread.Cell(row_idx+2, headers.index('Ngày giao bánh')+1, new_ngay.strftime("%d/%m/%Y"))
+                ]
+                if 'Ngày sinh nhật' in headers: cells_to_update.append(gspread.Cell(row_idx+2, headers.index('Ngày sinh nhật')+1, new_bday))
+                if 'Lưu ý' in headers: cells_to_update.append(gspread.Cell(row_idx+2, headers.index('Lưu ý')+1, new_note))
+                ws_data.update_cells(cells_to_update)
                 
+                # BATCH UPDATE 2: Lệnh xóa nhiều dòng cùng lúc bằng API nguyên thủy (Chỉ tốn đúng 1 thao tác)
                 df_tasks_temp = pd.DataFrame(st.session_state.tasks_data)
                 tasks_to_delete = df_tasks_temp[(df_tasks_temp['Tên người nhận'] == person_name) & (~df_tasks_temp['Task_ID'].astype(str).str.startswith('Manual_'))]
-                for i in sorted(tasks_to_delete.index.tolist(), reverse=True): ws_tasks.delete_rows(i + 2)
+                task_indices = tasks_to_delete.index.tolist()
+                
+                if task_indices:
+                    requests = []
+                    for i in sorted(task_indices, reverse=True):
+                        requests.append({
+                            "deleteDimension": {
+                                "range": {"sheetId": ws_tasks.id, "dimension": "ROWS", "startIndex": i + 1, "endIndex": i + 2}
+                            }
+                        })
+                    ws_tasks.spreadsheet.batch_update({"requests": requests})
                     
                 st.session_state.clear(); st.rerun()
 
 # --- SIDEBAR & BỘ LỌC TÌM KIẾM ---
 with st.sidebar:
     st.markdown("### ⚙️ QUẢN TRỊ")
-    if st.button("🔄 LÀM MỚI DỮ LIỆU", type="primary"): st.session_state.clear(); st.rerun()
+    if st.button("🔄 LÀM MỚI DỮ LIỆU"): st.session_state.clear(); st.rerun()
     st.caption("Nhấn nút này nếu bạn vừa sửa file Google Sheets.")
     st.markdown("---")
     st.markdown("### 🔍 BỘ LỌC NHANH")
@@ -371,8 +391,6 @@ with tab_todo:
             with c1:
                 is_done = r['Trạng thái'] == "Hoàn thành"
                 checked = st.checkbox(f"Hoàn thành task: {r['Tên Task']}", value=is_done, key=f"{r['Task_ID']}_{tab_key_suffix}")
-                
-                # BỎ ST.RERUN() Ở ĐÂY ĐỂ KHÔNG BỊ NHẢY TAB NỮA
                 if checked != is_done:
                     new_val = "Hoàn thành" if checked else "Chưa hoàn thành"
                     for real_idx, task_dict in enumerate(st.session_state.tasks_data):
@@ -433,14 +451,12 @@ with st.form("add_task_form", clear_on_submit=True):
                 y = task_date.year + m // 12
                 m = m % 12 + 1
                 day = task_date.day
-                # Check ngày cuối tháng thông minh (VD: 31/01 -> 28/02)
                 while True:
                     try: t_date = task_date.replace(year=y, month=m, day=day); break
                     except ValueError: day -= 1
-            else:
-                t_date = task_date
+            else: t_date = task_date
                 
-            new_id = f"Manual_{belong_to}_{(datetime.utcnow() + timedelta(hours=7)).strftime('%Y%m%d%H%M%S')}_{i}"
+            new_id = f"Manual_{belong_to}_{(datetime.now(timezone.utc) + timedelta(hours=7)).strftime('%Y%m%d%H%M%S')}_{i}"
             row_data = [new_id, t_date.strftime("%d/%m/%Y"), belong_to, tp, loai, task_name, thiep, sdt, diachi, luuy, "Chưa hoàn thành"]
             rows_to_append.append(row_data)
             
@@ -451,8 +467,7 @@ with st.form("add_task_form", clear_on_submit=True):
             
         ws_tasks.append_rows(rows_to_append)
         msg_placeholder.success(f"Đã thêm thành công {loop_count} task!")
-        time.sleep(1.2)
-        st.rerun()
+        time.sleep(1.2); st.rerun()
 
 st.write("---")
 
@@ -518,7 +533,7 @@ if not df_sum.empty:
         fig1.add_trace(go.Bar(name='Completed', x=sorted_chart_months, y=cp_counts, marker_color='#8E24AA', text=[v if v>0 else "" for v in cp_counts], textposition='auto'))
         fig1.add_trace(go.Scatter(name='Total', x=sorted_chart_months, y=total_counts, mode='lines+markers+text', marker=dict(color='#D81B60', size=8), line=dict(color='#D81B60', width=2, dash='dot'), text=[v if v>0 else "" for v in total_counts], textposition='top center'))
         fig1.update_layout(barmode='stack', title="Tiến độ & Tổng đơn / Tháng", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", y=-0.2, yanchor="top"), margin=dict(t=40, l=10, r=10, b=10))
-        with chart_col1: st.plotly_chart(fig1, use_container_width=True)
+        with chart_col1: st.plotly_chart(fig1)
 
         x_months = []
         x_locs = []
@@ -537,7 +552,7 @@ if not df_sum.empty:
         fig2.add_trace(go.Bar(name='Gato', x=[x_months, x_locs], y=y_gato, marker_color='#D81B60', text=[v if v>0 else "" for v in y_gato], textposition='auto'))
         fig2.add_trace(go.Bar(name='Cookies', x=[x_months, x_locs], y=y_cookie, marker_color='#8E24AA', text=[v if v>0 else "" for v in y_cookie], textposition='auto'))
         fig2.update_layout(barmode='stack', title="Phân bổ Loại Bánh & Khu vực", plot_bgcolor='rgba(0,0,0,0)', legend=dict(orientation="h", y=-0.2, yanchor="top"), margin=dict(t=40, l=10, r=10, b=10))
-        with chart_col2: st.plotly_chart(fig2, use_container_width=True)
+        with chart_col2: st.plotly_chart(fig2)
 
     # --- CHẾ ĐỘ VIEW ---
     if "Laptop mode" in view_mode:
@@ -563,7 +578,7 @@ if not df_sum.empty:
                         with m_cols[col_mapping[(stt, loc)]]:
                             for _, row in subset.iterrows():
                                 icon = "🎂" if row['Loại bánh'].lower() == "gato" else ("🍪" if row['Loại bánh'].lower() == "cookies" else "🍰")
-                                if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{stt}_{loc}_lap", type="secondary", use_container_width=True):
+                                if st.button(f"{icon} {row['Name']}", key=f"btn_{row['Name']}_{month}_{stt}_{loc}_lap"):
                                     show_detail_dialog(row['Name'])
 
     elif "Status Focused" in view_mode:
@@ -583,7 +598,7 @@ if not df_sum.empty:
                                 st.markdown(f"**📍 {l}**")
                                 for _, r in sl.iterrows():
                                     i = "🎂" if r['Loại bánh'].lower() == "gato" else "🍪"
-                                    if st.button(f"{i} {r['Name']}", key=f"btn_{r['Name']}_{month}_{s_name}_{l}_m1", type="secondary", use_container_width=True): show_detail_dialog(r['Name'])
+                                    if st.button(f"{i} {r['Name']}", key=f"btn_{r['Name']}_{month}_{s_name}_{l}_m1"): show_detail_dialog(r['Name'])
         with t_ny: render_m1("Not Yet")
         with t_ip: render_m1("In Progress")
         with t_cp: render_m1("Completed")
@@ -606,7 +621,7 @@ if not df_sum.empty:
                             st.markdown(f"**📍 {l}**")
                             for _, r in sl.iterrows():
                                 i = "🎂" if r['Loại bánh'].lower() == "gato" else "🍪"
-                                if st.button(f"{i} {r['Name']}", key=f"btn_{r['Name']}_{month}_{s_name}_{l}_m2", type="secondary", use_container_width=True): show_detail_dialog(r['Name'])
+                                if st.button(f"{i} {r['Name']}", key=f"btn_{r['Name']}_{month}_{s_name}_{l}_m2"): show_detail_dialog(r['Name'])
                 with t_ny: render_m2("Not Yet")
                 with t_ip: render_m2("In Progress")
                 with t_cp: render_m2("Completed")
@@ -622,8 +637,8 @@ note_col1, note_col2 = st.columns([1, 2])
 with note_col1:
     with st.form("add_note_form", clear_on_submit=True):
         note_text = st.text_area("Nhập nội dung Note:", height=150)
-        if st.form_submit_button("CREATE NOTE", type="primary") and note_text:
-            time_str = (datetime.utcnow() + timedelta(hours=7)).strftime("%d/%m/%Y %H:%M")
+        if st.form_submit_button("CREATE NOTE") and note_text:
+            time_str = (datetime.now(timezone.utc) + timedelta(hours=7)).strftime("%d/%m/%Y %H:%M")
             ws_notes.append_row([time_str, note_text])
             st.session_state.notes_data.append({"Thời gian": time_str, "Nội dung Note": note_text})
             st.rerun()
@@ -634,12 +649,12 @@ with note_col2:
         for idx, n in reversed(list(enumerate(st.session_state.notes_data))):
             st.markdown(f"<div class='note-box'><small style='color: #6a1b9a; font-weight: bold;'>🕒 {n.get('Thời gian', '')}</small><br><div style='margin-top: 5px; font-size: 1.1em; white-space: pre-wrap;'>{n.get('Nội dung Note', '')}</div></div>", unsafe_allow_html=True)
             if f"edit_mode_{idx}" not in st.session_state: st.session_state[f"edit_mode_{idx}"] = False
-            if st.button("✏️ Edit Note", key=f"btn_edit_{idx}", type="secondary"):
+            if st.button("✏️ Edit Note", key=f"btn_edit_{idx}"):
                 st.session_state[f"edit_mode_{idx}"] = not st.session_state[f"edit_mode_{idx}"]
                 st.rerun()
             if st.session_state[f"edit_mode_{idx}"]:
                 new_note_content = st.text_area("Sửa nội dung:", value=n.get('Nội dung Note', ''), key=f"text_edit_{idx}")
-                if st.button("Lưu thay đổi", key=f"save_note_{idx}", type="primary"):
+                if st.button("Lưu thay đổi", key=f"save_note_{idx}"):
                     ws_notes.update_cell(idx + 2, 2, new_note_content)
                     st.session_state.notes_data[idx]['Nội dung Note'] = new_note_content
                     st.session_state[f"edit_mode_{idx}"] = False 
